@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { AuthProvider } from "@/store/AuthContext";
+import MainLayout from "@/components/MainLayout";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -17,9 +19,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    // suppressHydrationWarning evita que las extensiones del navegador rompan Next.js
     <html lang="en" suppressHydrationWarning>
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          <MainLayout>{children}</MainLayout>
+        </AuthProvider>
+      </body>
     </html>
   );
 }
