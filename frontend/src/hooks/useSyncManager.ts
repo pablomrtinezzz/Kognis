@@ -5,6 +5,7 @@ import { useAuth } from "@/store/AuthContext";
 import { db, type LocalWorkout } from "@/lib/db";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === "true";
 
 // ─── Core sync logic (module-level, no React deps) ───────────────────────────
 
@@ -125,7 +126,8 @@ export function useSyncManager(): void {
   }, []);
 
   useEffect(() => {
-    if (!session) return;
+    // Skip network sync in dev bypass mode — fake token would always get 401
+    if (!session || BYPASS_AUTH) return;
 
     // Attempt sync immediately if already online
     if (navigator.onLine) {

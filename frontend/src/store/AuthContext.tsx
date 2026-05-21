@@ -5,6 +5,35 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { useRouter, usePathname } from "next/navigation";
 
+// ─── Dev bypass ───────────────────────────────────────────────────────────────
+// Set NEXT_PUBLIC_BYPASS_AUTH=true in .env.local to skip Supabase and use a
+// fake session. Lets you test the full UI without a real Supabase project.
+
+const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === "true";
+
+const DEV_USER = {
+  id: "dev-user-00000000-0000-0000-0000-000000000001",
+  aud: "authenticated",
+  role: "authenticated",
+  email: "dev@kognis.local",
+  app_metadata: { provider: "dev-bypass", providers: ["dev-bypass"] },
+  user_metadata: { full_name: "Dev User" },
+  identities: [],
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+} as unknown as User;
+
+const DEV_SESSION = {
+  access_token: "dev-bypass-token",
+  refresh_token: "dev-bypass-refresh",
+  expires_in: 3600,
+  expires_at: Math.floor(Date.now() / 1000) + 3600,
+  token_type: "bearer",
+  user: DEV_USER,
+} as unknown as Session;
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 type AuthContextType = {
   user: User | null;
   session: Session | null;
@@ -25,7 +54,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Check active session on mount
+    // Dev bypass: inject a fake session immediately, skip Supabase entirely
+    if (BYPASS_AUTH) {
+      setUser(DEV_USER);
+      setSession(DEV_SESSION);
+      setLoading(false);
+      return;
+    }
+
+    // Production: check active session on mount
     const checkSession = async () => {
       const {
         data: { session },

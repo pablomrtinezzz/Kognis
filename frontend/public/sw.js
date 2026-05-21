@@ -35,11 +35,11 @@ define(["./workbox-4754cb34"], function (e) {
     e.precacheAndRoute(
       [
         {
-          url: "/_next/static/OE0k0LfEu7vprOGNbQcCa/_buildManifest.js",
+          url: "/_next/static/Rgq_wRNqqWkp74TYP7nq7/_buildManifest.js",
           revision: "4fbe870ed3060a137e75da3c7a9e9d5e",
         },
         {
-          url: "/_next/static/OE0k0LfEu7vprOGNbQcCa/_ssgManifest.js",
+          url: "/_next/static/Rgq_wRNqqWkp74TYP7nq7/_ssgManifest.js",
           revision: "b6652df95db52feb4daf4eca35380933",
         },
         {
@@ -71,12 +71,12 @@ define(["./workbox-4754cb34"], function (e) {
           revision: "60c4d3cb88e52ce5",
         },
         {
-          url: "/_next/static/chunks/app/dashboard/page-84f195ff725112ee.js",
-          revision: "84f195ff725112ee",
+          url: "/_next/static/chunks/app/dashboard/page-60aebf896281ceb5.js",
+          revision: "60aebf896281ceb5",
         },
         {
-          url: "/_next/static/chunks/app/layout-9fb6a312632f92b6.js",
-          revision: "9fb6a312632f92b6",
+          url: "/_next/static/chunks/app/layout-21e1c65af113000c.js",
+          revision: "21e1c65af113000c",
         },
         {
           url: "/_next/static/chunks/app/login/page-e74787ab0c8fd6e5.js",
@@ -87,12 +87,12 @@ define(["./workbox-4754cb34"], function (e) {
           revision: "c0e54ebba1c0ecfe",
         },
         {
-          url: "/_next/static/chunks/app/workouts/new/page-5628bdf77171fbef.js",
-          revision: "5628bdf77171fbef",
+          url: "/_next/static/chunks/app/workouts/new/page-615ad4eb533aa0f0.js",
+          revision: "615ad4eb533aa0f0",
         },
         {
-          url: "/_next/static/chunks/app/workouts/page-368dd2cebc10f54b.js",
-          revision: "368dd2cebc10f54b",
+          url: "/_next/static/chunks/app/workouts/page-cf96670d3203cf9d.js",
+          revision: "cf96670d3203cf9d",
         },
         {
           url: "/_next/static/chunks/framework-5ce682ea41927f33.js",
