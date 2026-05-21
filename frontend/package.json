@@ -1,0 +1,26 @@
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "dexie": "^4.0.4",
+    "next": "latest",
+    "next-pwa": "^5.6.0",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "overrides": {
+    "postcss": "^8.5.10",
+    "serialize-javascript": "^6.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.15",
+    "typescript": "6.0.3"
+  }
+}
