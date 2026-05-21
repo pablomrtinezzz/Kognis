@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/store/AuthContext";
+import { useSyncManager } from "@/hooks/useSyncManager";
 import { Home, Target, Dumbbell, User } from "lucide-react";
 
 export default function MainLayout({
@@ -12,6 +13,7 @@ export default function MainLayout({
 }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
+  useSyncManager(); // Background sync: pending → server when online
 
   // Hide navigation bar if loading or on the login page
   if (loading || !user || pathname === "/login") {

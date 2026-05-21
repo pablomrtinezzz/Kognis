@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 # Import API routers and scheduler
-from src.api import goals, profiles
+from src.api import goals, profiles, workouts
 from src.core.config import settings
 from src.core.scheduler import scheduler
 
@@ -62,6 +62,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 # 3. Register API Routers
 app.include_router(profiles.router, prefix="/api/v1")
 app.include_router(goals.router, prefix="/api/v1")
+app.include_router(workouts.router, prefix="/api/v1")
 
 
 # 4. Health Endpoint
