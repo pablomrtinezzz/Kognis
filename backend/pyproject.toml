@@ -1,0 +1,20 @@
+[tool.ruff]
+# Maximum line length (Black standard)
+line-length = 88
+# Target Python version
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",  # Style errors (pycodestyle)
+    "W",  # Warnings (pycodestyle)
+    "F",  # Unused variables or logical errors (pyflakes)
+    "I",  # Automatically sort imports (isort)
+    "C4", # Improve list and dictionary comprehensions
+    "B",  # Detect potential logical bugs (flake8-bugbear)
+]
+ignore = ["B008"] # Allow function calls in argument defaults (required for FastAPI Depends)
+
+[tool.ruff.format]
+# Always use double quotes for strings (consistency)
+quote-style = "double"
