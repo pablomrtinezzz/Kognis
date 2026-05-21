@@ -10,7 +10,8 @@ router = APIRouter(prefix="/goals", tags=["Gamification & Goals"])
 @router.post("/", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)
 async def create_goal(goal_in: GoalCreate, user_id: str = Depends(get_current_user)):
     """Creates a new goal for the authenticated user."""
-    data = goal_in.model_dump()
+    # mode='json' serializes date → ISO string for Supabase compatibility
+    data = goal_in.model_dump(mode="json")
     data["user_id"] = user_id
     data["streak"] = 0  # Initial streak is always 0
 
@@ -60,4 +61,26 @@ async def update_goal_progress(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update goal: {str(e)}",
+        ) from e
+
+
+@router.delete("/{goal_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_goal(goal_id: str, user_id: str = Depends(get_current_user)):
+    """Deletes a specific goal owned by the authenticated user."""
+    try:
+        response = (
+            db.table("goals")
+            .delete()
+            .eq("id", goal_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Goal not found")
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete goal: {str(e)}",
         ) from e

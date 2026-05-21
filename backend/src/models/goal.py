@@ -1,6 +1,7 @@
+from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class GoalCreate(BaseModel):
@@ -10,9 +11,19 @@ class GoalCreate(BaseModel):
         ..., description="Category of the goal (e.g., 'workouts', 'study')"
     )
     target_value: float = Field(..., gt=0, description="The target number to reach")
-    deadline: Optional[str] = Field(
+    deadline: Optional[date] = Field(
         None, description="Optional deadline in YYYY-MM-DD format"
     )
+
+    @field_validator("deadline", mode="before")
+    @classmethod
+    def deadline_must_be_future(cls, v: object) -> object:
+        if v is None:
+            return v
+        parsed = date.fromisoformat(str(v)) if not isinstance(v, date) else v
+        if parsed < date.today():
+            raise ValueError("deadline must be today or a future date")
+        return parsed
 
 
 class GoalUpdate(BaseModel):
@@ -30,5 +41,5 @@ class GoalResponse(BaseModel):
     target_value: float
     current_value: float
     streak: int
-    deadline: Optional[str]
+    deadline: Optional[date]
     created_at: str

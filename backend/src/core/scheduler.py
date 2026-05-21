@@ -1,7 +1,9 @@
 import logging
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from src.core.config import settings
 from src.core.database import db
 
 logger = logging.getLogger(__name__)
@@ -47,8 +49,8 @@ async def evaluate_daily_streaks() -> None:
         logger.error(f"Failed to evaluate streaks: {str(e)}")
 
 
-# Initialize the Async Scheduler
-scheduler = AsyncIOScheduler()
+# Initialize the Async Scheduler anchored to the configured timezone
+scheduler = AsyncIOScheduler(timezone=ZoneInfo(settings.TIMEZONE))
 
-# Schedule the job to run every day at midnight (00:00)
+# Schedule the job to run every day at midnight in the configured timezone
 scheduler.add_job(evaluate_daily_streaks, trigger="cron", hour=0, minute=0)

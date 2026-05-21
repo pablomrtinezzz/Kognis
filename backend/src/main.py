@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 # Import API routers and scheduler
 from src.api import goals, profiles
+from src.core.config import settings
 from src.core.scheduler import scheduler
 
 # Initialize logging for backend monitoring
@@ -37,7 +38,7 @@ app = FastAPI(
 # 1. CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

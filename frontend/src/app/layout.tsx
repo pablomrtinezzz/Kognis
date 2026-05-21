@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import "./globals.css";
 
 export const viewport: Viewport = {
   themeColor: "#0B0F17",
@@ -18,16 +19,7 @@ export default function RootLayout({
   return (
     // suppressHydrationWarning evita que las extensiones del navegador rompan Next.js
     <html lang="en" suppressHydrationWarning>
-      <body
-        style={{
-          backgroundColor: "#0B0F17",
-          color: "#F8FAFC",
-          margin: 0,
-          fontFamily: "system-ui, sans-serif",
-        }}
-      >
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
