@@ -31,6 +31,16 @@ class WorkoutCreate(BaseModel):
     exercises: list[WorkoutExerciseCreate] = Field(..., min_length=1)
 
 
+class WorkoutUpdate(BaseModel):
+    """Same payload as WorkoutCreate but without local_id (taken from the URL path)."""
+
+    name: Optional[str] = Field(None, max_length=100)
+    started_at: datetime
+    finished_at: Optional[datetime] = None
+    notes: Optional[str] = Field(None, max_length=500)
+    exercises: list[WorkoutExerciseCreate] = Field(..., min_length=1)
+
+
 # ─── Response schemas (API → Client) ─────────────────────────────────────────
 
 

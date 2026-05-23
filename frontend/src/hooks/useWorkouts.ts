@@ -93,5 +93,67 @@ export function useWorkouts() {
     load();
   }, [load]);
 
-  return { workouts, loading, isOffline, refresh: load };
+  const deleteWorkout = useCallback(
+    async (localId: string) => {
+      // 1. Get exercise local_ids to cascade-delete their sets
+      const exercises = await db.workout_exercises
+        .where("workout_local_id")
+        .equals(localId)
+        .toArray();
+
+      const exerciseLocalIds = exercises.map((e) => e.local_id);
+
+      if (exerciseLocalIds.length > 0) {
+        await db.sets
+          .where("workout_exercise_local_id")
+          .anyOf(exerciseLocalIds)
+          .delete();
+      }
+      await db.workout_exercises
+        .where("workout_local_id")
+        .equals(localId)
+        .delete();
+
+      // Capture server_id before removing the row
+      const workout = await db.workouts.get(localId);
+      const hasBeenSynced = !!workout?.server_id;
+
+      await db.workouts.delete(localId);
+
+      // Optimistic UI update
+      setWorkouts((prev) => prev.filter((w) => w.local_id !== localId));
+
+      // 2. Propagate to server
+      if (!hasBeenSynced) return; // Never reached the server — nothing to do
+
+      if (navigator.onLine && session) {
+        try {
+          const res = await fetch(`${API_URL}/api/v1/workouts/${localId}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+          // 404 means already gone — treat as success
+          if (!res.ok && res.status !== 404)
+            throw new Error(`HTTP ${res.status}`);
+        } catch {
+          // Offline delete failed — queue for next sync
+          await db.mutations.add({
+            type: "DELETE_WORKOUT",
+            payload: { local_id: localId },
+            createdAt: new Date().toISOString(),
+          });
+        }
+      } else {
+        // Offline — queue the delete for when connection returns
+        await db.mutations.add({
+          type: "DELETE_WORKOUT",
+          payload: { local_id: localId },
+          createdAt: new Date().toISOString(),
+        });
+      }
+    },
+    [session],
+  );
+
+  return { workouts, loading, isOffline, refresh: load, deleteWorkout };
 }

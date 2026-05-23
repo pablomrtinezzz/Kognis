@@ -2,18 +2,17 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useAuth } from "@/store/AuthContext";
-import { db, type LocalWorkout } from "@/lib/db";
+import { db, type LocalWorkout, type OfflineMutation } from "@/lib/db";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === "true";
 
-// ─── Core sync logic (module-level, no React deps) ───────────────────────────
+// ─── Sync a single workout (POST for new, PUT for edited) ─────────────────────
 
 async function syncWorkout(
   workout: LocalWorkout,
   token: string,
 ): Promise<void> {
-  // Mark as syncing — prevents double-processing if called concurrently
   await db.workouts.update(workout.local_id, { sync_status: "syncing" });
 
   try {
@@ -45,27 +44,34 @@ async function syncWorkout(
       }),
     );
 
-    const res = await fetch(`${API_URL}/api/v1/workouts/`, {
-      method: "POST",
+    const body = JSON.stringify({
+      local_id: workout.local_id,
+      name: workout.name,
+      started_at: workout.started_at,
+      finished_at: workout.finished_at,
+      notes: workout.notes,
+      exercises: exercisesPayload,
+    });
+
+    // First sync → POST to create. Re-sync after edit → PUT to replace.
+    const isUpdate = !!workout.server_id;
+    const url = isUpdate
+      ? `${API_URL}/api/v1/workouts/${workout.local_id}`
+      : `${API_URL}/api/v1/workouts/`;
+
+    const res = await fetch(url, {
+      method: isUpdate ? "PUT" : "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        local_id: workout.local_id,
-        name: workout.name,
-        started_at: workout.started_at,
-        finished_at: workout.finished_at,
-        notes: workout.notes,
-        exercises: exercisesPayload,
-      }),
+      body,
     });
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const data = await res.json();
 
-    // Promote to 'synced' and attach server-generated IDs
     await db.workouts.update(workout.local_id, {
       server_id: data.id,
       sync_status: "synced",
@@ -84,8 +90,32 @@ async function syncWorkout(
       }
     }
   } catch {
-    // Leave it as 'error' — will be retried on next online event
     await db.workouts.update(workout.local_id, { sync_status: "error" });
+  }
+}
+
+// ─── Drain the DELETE_WORKOUT mutation queue ──────────────────────────────────
+
+async function syncDeleteMutations(token: string): Promise<void> {
+  const pending = await db.mutations
+    .where("type")
+    .equals("DELETE_WORKOUT")
+    .toArray();
+
+  for (const mutation of pending) {
+    const { local_id } = mutation.payload as { local_id: string };
+    try {
+      const res = await fetch(`${API_URL}/api/v1/workouts/${local_id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // 404 means it was already deleted on the server — still a success
+      if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
+
+      if (mutation.id != null) await db.mutations.delete(mutation.id);
+    } catch {
+      // Leave the mutation in the queue; retry on the next online event
+    }
   }
 }
 
@@ -120,16 +150,17 @@ export function useSyncManager(): void {
       for (const workout of pending) {
         await syncWorkout(workout, token);
       }
+
+      // Process queued offline deletes
+      await syncDeleteMutations(token);
     } finally {
       isSyncing.current = false;
     }
   }, []);
 
   useEffect(() => {
-    // Skip network sync in dev bypass mode — fake token would always get 401
     if (!session || BYPASS_AUTH) return;
 
-    // Attempt sync immediately if already online
     if (navigator.onLine) {
       runSync(session.access_token);
     }

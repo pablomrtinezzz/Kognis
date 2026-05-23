@@ -2,7 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.api.deps import get_current_user
 from src.core.database import db
-from src.models.workout import WorkoutCreate, WorkoutResponse, WorkoutSummary
+from src.models.workout import (
+    WorkoutCreate,
+    WorkoutResponse,
+    WorkoutSummary,
+    WorkoutUpdate,
+)
 
 router = APIRouter(prefix="/workouts", tags=["Physical Module"])
 
@@ -59,6 +64,140 @@ async def create_workout(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save workout: {str(e)}",
+        ) from e
+
+
+@router.put("/{local_id}", response_model=WorkoutResponse)
+async def update_workout(
+    local_id: str,
+    workout_in: WorkoutUpdate,
+    user_id: str = Depends(get_current_user),
+):
+    """
+    Replaces a workout's exercises and sets atomically.
+
+    Strategy: delete all existing exercises/sets for this workout, then
+    re-insert from the payload. Simpler than diffing and always consistent
+    because the client always sends the full current state.
+    """
+    try:
+        # Verify the workout exists and belongs to this user
+        existing = (
+            db.table("workouts")
+            .select("id, user_id")
+            .eq("local_id", local_id)
+            .single()
+            .execute()
+        )
+        if not existing.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Workout not found"
+            )
+        if existing.data["user_id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden"
+            )
+
+        workout_server_id = existing.data["id"]
+
+        # Cascade delete: sets first, then exercises
+        ex_ids_res = (
+            db.table("workout_exercises")
+            .select("id")
+            .eq("workout_id", workout_server_id)
+            .execute()
+        )
+        ex_ids = [row["id"] for row in ex_ids_res.data]
+
+        if ex_ids:
+            db.table("sets").delete().in_("workout_exercise_id", ex_ids).execute()
+            db.table("workout_exercises").delete().eq(
+                "workout_id", workout_server_id
+            ).execute()
+
+        # Update workout header
+        workout_data = workout_in.model_dump(mode="json", exclude={"exercises"})
+        workout_data["user_id"] = user_id
+        workout_res = (
+            db.table("workouts").update(workout_data).eq("local_id", local_id).execute()
+        )
+        workout = workout_res.data[0]
+
+        # Re-insert exercises and sets
+        exercises_out = []
+        for ex_in in workout_in.exercises:
+            ex_data = ex_in.model_dump(mode="json", exclude={"sets"})
+            ex_data["workout_id"] = workout_server_id
+
+            ex_res = db.table("workout_exercises").insert(ex_data).execute()
+            ex = ex_res.data[0]
+
+            sets_data = [
+                {**s.model_dump(mode="json"), "workout_exercise_id": ex["id"]}
+                for s in ex_in.sets
+            ]
+            sets_res = db.table("sets").insert(sets_data).execute()
+            exercises_out.append({**ex, "sets": sets_res.data})
+
+        return {**workout, "exercises": exercises_out}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update workout: {str(e)}",
+        ) from e
+
+
+@router.delete("/{local_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_workout(
+    local_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Deletes a workout and all its exercises/sets."""
+    try:
+        existing = (
+            db.table("workouts")
+            .select("id, user_id")
+            .eq("local_id", local_id)
+            .single()
+            .execute()
+        )
+        if not existing.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Workout not found"
+            )
+        if existing.data["user_id"] != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden"
+            )
+
+        workout_server_id = existing.data["id"]
+
+        # Cascade delete: sets → exercises → workout
+        ex_ids_res = (
+            db.table("workout_exercises")
+            .select("id")
+            .eq("workout_id", workout_server_id)
+            .execute()
+        )
+        ex_ids = [row["id"] for row in ex_ids_res.data]
+
+        if ex_ids:
+            db.table("sets").delete().in_("workout_exercise_id", ex_ids).execute()
+            db.table("workout_exercises").delete().eq(
+                "workout_id", workout_server_id
+            ).execute()
+
+        db.table("workouts").delete().eq("local_id", local_id).execute()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete workout: {str(e)}",
         ) from e
 
 

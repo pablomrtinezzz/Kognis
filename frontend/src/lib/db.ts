@@ -75,6 +75,15 @@ export class KognisDatabase extends Dexie {
         // v1 workouts used an incompatible schema (PK was 'id', not 'local_id')
         await tx.table("workouts").clear();
       });
+
+    // v3 — add started_at index to workouts to allow ordered queries
+    this.version(3).stores({
+      mutations: "++id, type, createdAt",
+      goals: "id, category",
+      workouts: "local_id, server_id, sync_status, user_id, started_at",
+      workout_exercises: "local_id, workout_local_id, sync_status",
+      sets: "local_id, workout_exercise_local_id, sync_status",
+    });
   }
 }
 

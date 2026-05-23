@@ -1,7 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Plus, CloudUpload, Loader, AlertCircle, WifiOff } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  AlertCircle,
+  CloudUpload,
+  Loader,
+  Plus,
+  Trash2,
+  WifiOff,
+} from "lucide-react";
 import { useWorkouts } from "@/hooks/useWorkouts";
 import type { LocalWorkout, SyncStatus } from "@/lib/db";
 
@@ -50,23 +59,77 @@ function SyncStatusIcon({ status }: { status: SyncStatus }) {
         <AlertCircle size={14} className="text-red-400" />
       </span>
     );
-  return null; // synced — no indicator needed
+  return null;
 }
 
-function WorkoutCard({ workout }: { workout: LocalWorkout }) {
+interface WorkoutCardProps {
+  workout: LocalWorkout;
+  onDelete: (localId: string) => void;
+}
+
+function WorkoutCard({ workout, onDelete }: WorkoutCardProps) {
+  const router = useRouter();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const time = new Date(workout.started_at).toLocaleTimeString("es-ES", {
     hour: "2-digit",
     minute: "2-digit",
   });
 
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirmDelete) {
+      onDelete(workout.local_id);
+    } else {
+      setConfirmDelete(true);
+    }
+  };
+
+  const handleCancelDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmDelete(false);
+  };
+
   return (
-    <div className="p-5 rounded-2xl bg-[#1C2331] border border-gray-800 flex flex-col gap-1.5">
+    <div
+      onClick={() => router.push(`/workouts/edit/${workout.local_id}`)}
+      className="p-5 rounded-2xl bg-[#1C2331] border border-gray-800 flex flex-col gap-1.5 cursor-pointer hover:border-gray-600 active:scale-[0.99] transition-all"
+    >
       <div className="flex items-start justify-between gap-3">
-        <p className="font-semibold text-foreground leading-tight">
+        <p className="font-semibold text-foreground leading-tight flex-1">
           {workout.name || "Entreno sin nombre"}
         </p>
-        <SyncStatusIcon status={workout.sync_status} />
+
+        <div className="flex items-center gap-2 shrink-0">
+          <SyncStatusIcon status={workout.sync_status} />
+
+          {confirmDelete ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleDeleteClick}
+                className="text-xs text-red-400 font-semibold hover:text-red-300 transition-colors px-1"
+              >
+                Confirmar
+              </button>
+              <button
+                onClick={handleCancelDelete}
+                className="text-xs text-foreground/40 hover:text-foreground/70 transition-colors px-1"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleDeleteClick}
+              className="text-foreground/25 hover:text-red-400 transition-colors p-0.5"
+              aria-label="Eliminar entreno"
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
       </div>
+
       <p className="text-xs text-foreground/50">
         {formatDate(workout.started_at)}, {time} ·{" "}
         {formatDuration(workout.started_at, workout.finished_at)}
@@ -84,11 +147,10 @@ function WorkoutCardSkeleton() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function WorkoutsPage() {
-  const { workouts, loading, isOffline } = useWorkouts();
+  const { workouts, loading, isOffline, deleteWorkout } = useWorkouts();
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Entrenos</h1>
         <div className="flex items-center gap-3">
@@ -108,7 +170,6 @@ export default function WorkoutsPage() {
         </div>
       </div>
 
-      {/* Loading skeletons */}
       {loading && (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
@@ -117,7 +178,6 @@ export default function WorkoutsPage() {
         </div>
       )}
 
-      {/* Empty state */}
       {!loading && workouts.length === 0 && (
         <div className="p-8 rounded-2xl bg-[#1C2331] border border-gray-800 text-center space-y-4">
           <p className="text-foreground/60 text-sm">
@@ -133,11 +193,14 @@ export default function WorkoutsPage() {
         </div>
       )}
 
-      {/* Workout list */}
       {!loading && workouts.length > 0 && (
         <div className="space-y-3">
           {workouts.map((w) => (
-            <WorkoutCard key={w.local_id} workout={w} />
+            <WorkoutCard
+              key={w.local_id}
+              workout={w}
+              onDelete={deleteWorkout}
+            />
           ))}
         </div>
       )}
