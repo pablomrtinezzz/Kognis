@@ -54,3 +54,4 @@ frontend/.vercel/
 .vscode/
 *.swp
 *.swo
+frontend/tsconfig.tsbuildinfo
