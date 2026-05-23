@@ -1,140 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { Copy, Plus, Trash2 } from "lucide-react";
+import { EXERCISE_CATALOG, ALL_EXERCISES } from "@/lib/exercises";
 
-// ─── Exercise catalog ──────────────────────────────────────────────────────────
-
-export const EXERCISE_CATALOG: Record<string, string[]> = {
-  Pecho: [
-    "Press banca",
-    "Press banca inclinado",
-    "Press banca declinado",
-    "Press con mancuernas",
-    "Press con mancuernas inclinado",
-    "Cruce de poleas alto",
-    "Cruce de poleas bajo",
-    "Cruce de poleas medio",
-    "Aperturas con mancuernas",
-    "Pec Deck (mariposa)",
-    "Fondos en paralelas",
-    "Pull-over con mancuerna",
-    "Flexiones",
-    "Flexiones con lastre",
-  ],
-  Espalda: [
-    "Dominadas (prono)",
-    "Chin-up (supino)",
-    "Jalón al pecho",
-    "Jalón agarre estrecho",
-    "Jalón en V",
-    "Remo con barra",
-    "Remo T-bar",
-    "Remo con mancuerna",
-    "Remo en polea baja",
-    "Remo en máquina",
-    "Peso muerto convencional",
-    "Peso muerto sumo",
-    "Pull-over en polea",
-    "Straight-arm pulldown",
-    "Buenos días",
-    "Hiperextensión",
-  ],
-  Pierna: [
-    "Sentadilla libre",
-    "Sentadilla en Smith",
-    "Sentadilla búlgara",
-    "Sentadilla frontal",
-    "Prensa de piernas",
-    "Hack squat",
-    "Extensión de cuádriceps",
-    "Curl de femoral tumbado",
-    "Curl de femoral sentado",
-    "Zancadas con barra",
-    "Zancadas con mancuernas",
-    "Zancadas caminando",
-    "Hip thrust",
-    "Puente de glúteo",
-    "Peso muerto rumano",
-    "Peso muerto con mancuernas",
-    "Abducción de cadera",
-    "Aducción de cadera",
-    "Pantorrillas de pie",
-    "Pantorrillas sentado",
-  ],
-  Hombros: [
-    "Press militar con barra",
-    "Press militar con mancuernas",
-    "Press Arnold",
-    "Press en máquina",
-    "Elevaciones laterales",
-    "Elevaciones laterales en polea",
-    "Elevaciones frontales con barra",
-    "Elevaciones frontales con mancuernas",
-    "Elevaciones frontales en polea",
-    "Pájaro (posterior)",
-    "Face pull",
-    "Encogimientos con barra",
-    "Encogimientos con mancuernas",
-  ],
-  Bíceps: [
-    "Curl con barra recta",
-    "Curl con barra EZ",
-    "Curl con mancuernas alterno",
-    "Curl con mancuernas simultáneo",
-    "Curl martillo",
-    "Curl en predicador (Scott)",
-    "Curl concentrado",
-    "Curl araña (spider curl)",
-    "Curl en polea baja",
-    "Curl en máquina",
-  ],
-  Tríceps: [
-    "Press francés con barra EZ",
-    "Press francés con mancuernas",
-    "Skull crusher",
-    "Extensión en polea alta (cuerda)",
-    "Extensión en polea alta (barra)",
-    "Extensión en polea baja",
-    "Extensión sobre la cabeza",
-    "Press cerrado",
-    "Fondos en banco",
-    "Fondos en paralelas (tríceps)",
-    "Patada de tríceps",
-  ],
-  Core: [
-    "Plancha frontal",
-    "Plancha lateral",
-    "Crunch",
-    "Crunch con cable",
-    "Crunch en máquina",
-    "Rueda abdominal",
-    "Elevación de piernas en barra",
-    "Elevación de piernas en suelo",
-    "Hanging knee raise",
-    "Russian twist",
-    "Dead bug",
-    "Bird dog",
-    "Pallof press",
-    "L-sit",
-    "Tijeras",
-  ],
-  Cardio: [
-    "Remo ergómetro",
-    "Bicicleta estática",
-    "Elíptica",
-    "Cinta de correr",
-    "Salto a la comba",
-    "Burpees",
-    "Box jumps",
-    "Mountain climbers",
-    "Sprints",
-    "Escalador (stepper)",
-  ],
-};
-
-export const ALL_EXERCISES = Object.entries(EXERCISE_CATALOG).flatMap(
-  ([muscle, names]) => names.map((name) => ({ muscle, name })),
-);
+export { EXERCISE_CATALOG, ALL_EXERCISES };
 
 // ─── Draft types ──────────────────────────────────────────────────────────────
 
@@ -317,9 +187,7 @@ export function ExerciseCombobox({
   );
 }
 
-// ─── Shared set/exercise form rows ────────────────────────────────────────────
-
-import { Copy, Plus, Trash2 } from "lucide-react";
+// ─── Exercise card ────────────────────────────────────────────────────────────
 
 interface ExerciseCardProps {
   ex: DraftExercise;
@@ -352,7 +220,6 @@ export function ExerciseCard({
 }: ExerciseCardProps) {
   return (
     <div className="rounded-3xl bg-card border border-white/[0.06] shadow-card overflow-visible">
-      {/* Exercise header */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.05]">
         <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/20 tabular-nums shrink-0 w-4 text-center">
           {exIdx + 1}
@@ -373,7 +240,6 @@ export function ExerciseCard({
         )}
       </div>
 
-      {/* Column headers */}
       <div className="grid grid-cols-[1.75rem_1fr_1fr_1.75rem_1.75rem] gap-2 px-5 pt-4 pb-1.5">
         <span className="text-[9px] text-white/20 text-center font-bold uppercase tracking-[0.1em]">
           #
@@ -388,7 +254,6 @@ export function ExerciseCard({
         <span />
       </div>
 
-      {/* Set rows */}
       <div className="px-5 pb-4 space-y-2">
         {ex.sets.map((s, setIdx) => (
           <div
@@ -436,7 +301,6 @@ export function ExerciseCard({
         ))}
       </div>
 
-      {/* Add set */}
       <button
         onClick={onAddSet}
         className="w-full py-3.5 text-[11px] font-bold uppercase tracking-[0.1em] text-white/25 hover:text-accent hover:bg-accent/[0.04] border-t border-white/[0.05] transition-all duration-300 ease-out rounded-b-3xl"
@@ -447,7 +311,7 @@ export function ExerciseCard({
   );
 }
 
-// ─── Shared exercise list actions ─────────────────────────────────────────────
+// ─── Exercise list actions ────────────────────────────────────────────────────
 
 export function useExerciseActions(
   setExercises: React.Dispatch<React.SetStateAction<DraftExercise[]>>,
@@ -524,7 +388,7 @@ export function useExerciseActions(
   };
 }
 
-// ─── Shared exercise list renderer ───────────────────────────────────────────
+// ─── Exercise list renderer ───────────────────────────────────────────────────
 
 interface ExerciseListProps {
   exercises: DraftExercise[];
@@ -565,7 +429,7 @@ export function ExerciseList({ exercises, actions }: ExerciseListProps) {
   );
 }
 
-// ─── Workout templates ────────────────────────────────────────────────────────
+// ─── Static workout templates (UI presets) ────────────────────────────────────
 
 export interface WorkoutTemplate {
   id: string;

@@ -1,0 +1,148 @@
+// Shared exercise catalog — single source of truth used by the workout form,
+// progress hooks, and any future feature that needs exercise→muscle mapping.
+
+export const EXERCISE_CATALOG: Record<string, string[]> = {
+  Pecho: [
+    "Press banca",
+    "Press banca inclinado",
+    "Press banca declinado",
+    "Press con mancuernas",
+    "Press con mancuernas inclinado",
+    "Cruce de poleas alto",
+    "Cruce de poleas bajo",
+    "Cruce de poleas medio",
+    "Aperturas con mancuernas",
+    "Pec Deck (mariposa)",
+    "Fondos en paralelas",
+    "Pull-over con mancuerna",
+    "Flexiones",
+    "Flexiones con lastre",
+  ],
+  Espalda: [
+    "Dominadas (prono)",
+    "Chin-up (supino)",
+    "Jalón al pecho",
+    "Jalón agarre estrecho",
+    "Jalón en V",
+    "Remo con barra",
+    "Remo T-bar",
+    "Remo con mancuerna",
+    "Remo en polea baja",
+    "Remo en máquina",
+    "Peso muerto convencional",
+    "Peso muerto sumo",
+    "Pull-over en polea",
+    "Straight-arm pulldown",
+    "Buenos días",
+    "Hiperextensión",
+  ],
+  Pierna: [
+    "Sentadilla libre",
+    "Sentadilla en Smith",
+    "Sentadilla búlgara",
+    "Sentadilla frontal",
+    "Prensa de piernas",
+    "Hack squat",
+    "Extensión de cuádriceps",
+    "Curl de femoral tumbado",
+    "Curl de femoral sentado",
+    "Zancadas con barra",
+    "Zancadas con mancuernas",
+    "Zancadas caminando",
+    "Hip thrust",
+    "Puente de glúteo",
+    "Peso muerto rumano",
+    "Peso muerto con mancuernas",
+    "Abducción de cadera",
+    "Aducción de cadera",
+    "Pantorrillas de pie",
+    "Pantorrillas sentado",
+  ],
+  Hombros: [
+    "Press militar con barra",
+    "Press militar con mancuernas",
+    "Press Arnold",
+    "Press en máquina",
+    "Elevaciones laterales",
+    "Elevaciones laterales en polea",
+    "Elevaciones frontales con barra",
+    "Elevaciones frontales con mancuernas",
+    "Elevaciones frontales en polea",
+    "Pájaro (posterior)",
+    "Face pull",
+    "Encogimientos con barra",
+    "Encogimientos con mancuernas",
+  ],
+  Bíceps: [
+    "Curl con barra recta",
+    "Curl con barra EZ",
+    "Curl con mancuernas alterno",
+    "Curl con mancuernas simultáneo",
+    "Curl martillo",
+    "Curl en predicador (Scott)",
+    "Curl concentrado",
+    "Curl araña (spider curl)",
+    "Curl en polea baja",
+    "Curl en máquina",
+  ],
+  Tríceps: [
+    "Press francés con barra EZ",
+    "Press francés con mancuernas",
+    "Skull crusher",
+    "Extensión en polea alta (cuerda)",
+    "Extensión en polea alta (barra)",
+    "Extensión en polea baja",
+    "Extensión sobre la cabeza",
+    "Press cerrado",
+    "Fondos en banco",
+    "Fondos en paralelas (tríceps)",
+    "Patada de tríceps",
+  ],
+  Core: [
+    "Plancha frontal",
+    "Plancha lateral",
+    "Crunch",
+    "Crunch con cable",
+    "Crunch en máquina",
+    "Rueda abdominal",
+    "Elevación de piernas en barra",
+    "Elevación de piernas en suelo",
+    "Hanging knee raise",
+    "Russian twist",
+    "Dead bug",
+    "Bird dog",
+    "Pallof press",
+    "L-sit",
+    "Tijeras",
+  ],
+  Cardio: [
+    "Remo ergómetro",
+    "Bicicleta estática",
+    "Elíptica",
+    "Cinta de correr",
+    "Salto a la comba",
+    "Burpees",
+    "Box jumps",
+    "Mountain climbers",
+    "Sprints",
+    "Escalador (stepper)",
+  ],
+};
+
+export const ALL_EXERCISES = Object.entries(EXERCISE_CATALOG).flatMap(
+  ([muscle, names]) => names.map((name) => ({ muscle, name })),
+);
+
+// Inverted map: "Press banca" → "Pecho"
+const _EXERCISE_TO_MUSCLE: Record<string, string> = Object.entries(
+  EXERCISE_CATALOG,
+).reduce<Record<string, string>>((acc, [muscle, names]) => {
+  names.forEach((name) => {
+    acc[name] = muscle;
+  });
+  return acc;
+}, {});
+
+export function getExerciseMuscle(exerciseName: string): string | null {
+  return _EXERCISE_TO_MUSCLE[exerciseName] ?? null;
+}

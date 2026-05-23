@@ -13,6 +13,7 @@ import {
 import { useDashboardData, type Goal } from "@/hooks/useDashboardData";
 import { useWorkoutTemplates } from "@/hooks/useWorkoutTemplates";
 import { useAuth } from "@/store/AuthContext";
+import { MuscularBalanceCard } from "@/components/MuscularBalance";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -324,6 +325,9 @@ export default function DashboardPage() {
 
       {/* ── Today's workout ── */}
       <TodayWorkout />
+
+      {/* ── Muscular balance ── */}
+      <MuscularBalanceCard />
 
       {/* ── Stats ── */}
       {!loading && goals.length > 0 && (

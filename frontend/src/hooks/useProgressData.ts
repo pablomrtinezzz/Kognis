@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { db } from "@/lib/db";
+import { getExerciseMuscle } from "@/lib/exercises";
 
 export interface ProgressPoint {
   date: string; // YYYY-MM-DD
@@ -158,4 +159,59 @@ export function useProgressData(exerciseName: string | null) {
   }, [exerciseName]);
 
   return { points, suggestion, exercises, loading };
+}
+
+export function useWeeklyMuscleVolume() {
+  const [volume, setVolume] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const since = new Date();
+      since.setDate(since.getDate() - 7);
+      since.setHours(0, 0, 0, 0);
+
+      const recentWorkouts = await db.workouts
+        .filter((w) => new Date(w.started_at) >= since)
+        .toArray();
+
+      if (recentWorkouts.length === 0) {
+        setVolume({});
+        setLoading(false);
+        return;
+      }
+
+      const workoutLocalIds = recentWorkouts.map((w) => w.local_id);
+
+      const exercises = await db.workout_exercises
+        .where("workout_local_id")
+        .anyOf(workoutLocalIds)
+        .toArray();
+
+      const exLocalIds = exercises.map((e) => e.local_id);
+
+      const sets = await db.sets
+        .where("workout_exercise_local_id")
+        .anyOf(exLocalIds)
+        .toArray();
+
+      const exMap: Record<string, string> = {};
+      for (const ex of exercises) exMap[ex.local_id] = ex.exercise_name;
+
+      const counts: Record<string, number> = {};
+      for (const s of sets) {
+        if (!s.reps || s.reps <= 0) continue;
+        const exerciseName = exMap[s.workout_exercise_local_id];
+        if (!exerciseName) continue;
+        const muscle = getExerciseMuscle(exerciseName);
+        if (!muscle) continue;
+        counts[muscle] = (counts[muscle] ?? 0) + 1;
+      }
+
+      setVolume(counts);
+      setLoading(false);
+    })();
+  }, []);
+
+  return { volume, loading };
 }
