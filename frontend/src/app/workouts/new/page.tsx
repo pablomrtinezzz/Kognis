@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle } from "lucide-react";
 import { useAuth } from "@/store/AuthContext";
 import { db } from "@/lib/db";
@@ -12,18 +12,53 @@ import {
   useExerciseActions,
 } from "../_workout-form";
 
-export default function NewWorkoutPage() {
+// ─── Inner page (uses useSearchParams — must be inside Suspense) ───────────────
+
+function NewWorkoutInner() {
   const router = useRouter();
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const fromTemplateId = searchParams.get("from");
 
   const startedAt = useRef(new Date().toISOString());
 
   const [workoutName, setWorkoutName] = useState("");
-  const [exercises, setExercises] = useState<DraftExercise[]>([newExercise()]);
+  const [exercises, setExercises] = useState<DraftExercise[]>([]);
+  const [templateLoading, setTemplateLoading] = useState(!!fromTemplateId);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const actions = useExerciseActions(setExercises);
+
+  useEffect(() => {
+    if (!fromTemplateId) {
+      setExercises([newExercise()]);
+      return;
+    }
+
+    (async () => {
+      const template = await db.workout_templates.get(fromTemplateId);
+      if (!template) {
+        setExercises([newExercise()]);
+        setTemplateLoading(false);
+        return;
+      }
+
+      setWorkoutName(template.name);
+      setExercises(
+        template.exercises.map(({ name, sets, reps }) => ({
+          localId: crypto.randomUUID(),
+          name,
+          sets: Array.from({ length: sets }, () => ({
+            localId: crypto.randomUUID(),
+            reps: String(reps),
+            weightKg: "",
+          })),
+        })),
+      );
+      setTemplateLoading(false);
+    })();
+  }, [fromTemplateId]);
 
   const handleSave = async () => {
     setError(null);
@@ -73,7 +108,7 @@ export default function NewWorkoutPage() {
         }
       }
 
-      router.push("/workouts");
+      router.push("/progress");
     } catch {
       setError("No se pudo guardar el entreno. Inténtalo de nuevo.");
       setSaving(false);
@@ -86,43 +121,83 @@ export default function NewWorkoutPage() {
   });
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-gray-800 -mx-4 md:-mx-8 px-4 md:px-8 py-3 mb-6 flex items-center justify-between">
+    <div className="max-w-xl mx-auto">
+      {/* ── Sticky header ── */}
+      <div className="sticky top-0 z-10 -mx-4 md:-mx-8 px-4 md:px-8 py-3 mb-8 flex items-center justify-between bg-background/80 backdrop-blur-2xl border-b border-white/[0.05]">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-foreground/60 hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-white/40 hover:text-white/80 transition-all duration-300 ease-out text-sm font-medium active:scale-[0.96]"
         >
-          <ArrowLeft size={20} />
-          <span className="text-sm">Entrenos</span>
+          <ArrowLeft size={16} strokeWidth={2} />
+          Rutinas
         </button>
         <button
           onClick={handleSave}
-          disabled={exercises.length === 0 || saving}
-          className="flex items-center gap-1.5 bg-accent text-[#0B0F17] text-sm font-bold px-4 py-2 rounded-xl disabled:opacity-40 active:scale-95 transition-all"
+          disabled={exercises.length === 0 || saving || templateLoading}
+          className="flex items-center gap-1.5 bg-accent text-black text-sm font-bold px-5 py-2 rounded-full disabled:opacity-30 active:scale-[0.96] transition-all duration-300 ease-out shadow-accent-glow"
         >
-          <CheckCircle size={16} />
-          {saving ? "Guardando…" : "Guardar"}
+          <CheckCircle size={14} strokeWidth={2.5} />
+          {saving ? "Guardando…" : "Finalizar"}
         </button>
       </div>
 
+      {/* ── Title ── */}
       <div className="mb-8 space-y-1">
         <input
           type="text"
           value={workoutName}
           onChange={(e) => setWorkoutName(e.target.value)}
-          placeholder="Nombre del entreno (opcional)"
-          className="w-full bg-transparent text-xl font-bold placeholder-foreground/20 focus:outline-none"
+          placeholder="Nombre del entreno"
+          className="w-full bg-transparent text-2xl font-bold tracking-tight text-white/90 placeholder-white/15 focus:outline-none"
         />
-        <p className="text-xs text-foreground/40">Iniciado a las {startTime}</p>
+        <p className="text-xs text-white/25 font-medium tabular-nums">
+          Iniciado a las {startTime}
+        </p>
       </div>
 
-      <ExerciseList exercises={exercises} actions={actions} />
-
-      {error && (
-        <p className="mt-4 text-sm text-red-400 text-center">{error}</p>
+      {/* ── Loading skeleton ── */}
+      {templateLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-[140px] rounded-3xl bg-card border border-white/[0.05] animate-pulse"
+            />
+          ))}
+        </div>
+      ) : (
+        <>
+          <ExerciseList exercises={exercises} actions={actions} />
+          {error && (
+            <p className="mt-4 text-sm text-red-400/90 text-center font-medium">
+              {error}
+            </p>
+          )}
+        </>
       )}
 
-      <div className="h-8" />
+      <div className="h-10" />
     </div>
+  );
+}
+
+// ─── Suspense wrapper ─────────────────────────────────────────────────────────
+
+export default function NewWorkoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-xl mx-auto space-y-3 pt-16">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-[140px] rounded-3xl bg-card border border-white/[0.05] animate-pulse"
+            />
+          ))}
+        </div>
+      }
+    >
+      <NewWorkoutInner />
+    </Suspense>
   );
 }

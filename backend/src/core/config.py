@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_SERVICE_KEY: str
 
+    # Dev bypass — allows the fake "dev-bypass-token" in deps.py; NEVER enable in prod
+    BYPASS_AUTH: bool = False
+
     # Gemini API
     GEMINI_API_KEY: str | None = None
 

@@ -1,8 +1,15 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { seedDevDataIfEmpty } from "@/lib/devSeed";
 import { useRouter, usePathname } from "next/navigation";
 
 // ─── Dev bypass ───────────────────────────────────────────────────────────────
@@ -38,12 +45,14 @@ type AuthContextType = {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  activateBypass: (() => void) | null;
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   loading: true,
+  activateBypass: null,
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -53,23 +62,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
 
+  const activateBypass = useCallback(async () => {
+    await seedDevDataIfEmpty();
+    setUser(DEV_USER);
+    setSession(DEV_SESSION);
+  }, []);
+
   useEffect(() => {
-    // Dev bypass: inject a fake session immediately, skip Supabase entirely
+    // Dev bypass: set loading=false so the login page renders, but don't inject
+    // the session yet — that happens when the user clicks the bypass button.
     if (BYPASS_AUTH) {
-      setUser(DEV_USER);
-      setSession(DEV_SESSION);
       setLoading(false);
       return;
     }
 
     // Production: check active session on mount
     const checkSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+      } catch {
+        // Supabase unreachable — stay unauthenticated but unblock the UI
+      } finally {
+        setLoading(false);
+      }
     };
 
     checkSession();
@@ -88,20 +107,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Route protection logic
   useEffect(() => {
-    if (!loading) {
-      const isAuthRoute = pathname === "/login";
-      if (!user && !isAuthRoute) {
-        // Kick out unauthenticated users
-        router.push("/login");
-      } else if (user && (isAuthRoute || pathname === "/")) {
-        // Redirect logged-in users away from login/root to the dashboard
+    if (loading) return;
+    const isAuthRoute = pathname === "/login";
+
+    if (BYPASS_AUTH) {
+      // Dev bypass: redirect / to the right place, but never kick off other routes
+      if (pathname === "/") {
+        router.push(user ? "/dashboard" : "/login");
+      } else if (user && isAuthRoute) {
         router.push("/dashboard");
       }
+      return;
+    }
+
+    if (!user && !isAuthRoute) {
+      router.push("/login");
+    } else if (user && (isAuthRoute || pathname === "/")) {
+      router.push("/dashboard");
     }
   }, [user, loading, pathname, router]);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        activateBypass: BYPASS_AUTH ? activateBypass : null,
+      }}
+    >
       {/* Loading screen to prevent flash of unauthenticated content */}
       {loading ? (
         <div className="h-screen w-full flex flex-col items-center justify-center bg-background text-primary">

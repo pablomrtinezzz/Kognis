@@ -3,203 +3,274 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  AlertCircle,
-  CloudUpload,
-  Loader,
-  Plus,
-  Trash2,
-  WifiOff,
-} from "lucide-react";
-import { useWorkouts } from "@/hooks/useWorkouts";
-import type { LocalWorkout, SyncStatus } from "@/lib/db";
+import { Dumbbell, Play, Plus, Trash2 } from "lucide-react";
+import { useWorkoutTemplates } from "@/hooks/useWorkoutTemplates";
+import type { LocalWorkoutTemplate } from "@/lib/db";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Day chips ─────────────────────────────────────────────────────────────────
 
-function formatDuration(started: string, finished?: string): string {
-  if (!finished) return "En curso";
-  const mins = Math.round(
-    (new Date(finished).getTime() - new Date(started).getTime()) / 60000,
-  );
-  if (mins < 60) return `${mins} min`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m > 0 ? `${h}h ${m}min` : `${h}h`;
-}
+const DAY_LABELS = ["L", "M", "X", "J", "V", "S", "D"];
 
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-
-  if (d.toDateString() === today.toDateString()) return "Hoy";
-  if (d.toDateString() === yesterday.toDateString()) return "Ayer";
-  return d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function SyncStatusIcon({ status }: { status: SyncStatus }) {
-  if (status === "pending")
-    return (
-      <span title="Pendiente de sincronizar">
-        <CloudUpload size={14} className="text-yellow-400" />
-      </span>
-    );
-  if (status === "syncing")
-    return (
-      <span title="Sincronizando…">
-        <Loader size={14} className="text-yellow-400 animate-spin" />
-      </span>
-    );
-  if (status === "error")
-    return (
-      <span title="Error al sincronizar — se reintentará">
-        <AlertCircle size={14} className="text-red-400" />
-      </span>
-    );
-  return null;
-}
-
-interface WorkoutCardProps {
-  workout: LocalWorkout;
-  onDelete: (localId: string) => void;
-}
-
-function WorkoutCard({ workout, onDelete }: WorkoutCardProps) {
-  const router = useRouter();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
-  const time = new Date(workout.started_at).toLocaleTimeString("es-ES", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (confirmDelete) {
-      onDelete(workout.local_id);
-    } else {
-      setConfirmDelete(true);
-    }
-  };
-
-  const handleCancelDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setConfirmDelete(false);
-  };
-
+function DayChips({
+  templateId,
+  weekdays,
+  allTemplates,
+  onToggle,
+}: {
+  templateId: string;
+  weekdays: number[];
+  allTemplates: LocalWorkoutTemplate[];
+  onToggle: (day: number) => void;
+}) {
   return (
-    <div
-      onClick={() => router.push(`/workouts/edit/${workout.local_id}`)}
-      className="p-5 rounded-2xl bg-[#1C2331] border border-gray-800 flex flex-col gap-1.5 cursor-pointer hover:border-gray-600 active:scale-[0.99] transition-all"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <p className="font-semibold text-foreground leading-tight flex-1">
-          {workout.name || "Entreno sin nombre"}
-        </p>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <SyncStatusIcon status={workout.sync_status} />
-
-          {confirmDelete ? (
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={handleDeleteClick}
-                className="text-xs text-red-400 font-semibold hover:text-red-300 transition-colors px-1"
-              >
-                Confirmar
-              </button>
-              <button
-                onClick={handleCancelDelete}
-                className="text-xs text-foreground/40 hover:text-foreground/70 transition-colors px-1"
-              >
-                Cancelar
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={handleDeleteClick}
-              className="text-foreground/25 hover:text-red-400 transition-colors p-0.5"
-              aria-label="Eliminar entreno"
-            >
-              <Trash2 size={15} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      <p className="text-xs text-foreground/50">
-        {formatDate(workout.started_at)}, {time} ·{" "}
-        {formatDuration(workout.started_at, workout.finished_at)}
-      </p>
+    <div className="flex items-center gap-1">
+      {DAY_LABELS.map((label, day) => {
+        const active = weekdays.includes(day);
+        const takenBy = allTemplates.find(
+          (t) => t.id !== templateId && t.weekdays?.includes(day),
+        );
+        return (
+          <button
+            key={day}
+            type="button"
+            title={takenBy ? `Asignado a "${takenBy.name}"` : undefined}
+            onClick={() => onToggle(day)}
+            className={`w-6 h-6 rounded-full text-[10px] font-bold transition-all duration-300 ease-out active:scale-90
+              ${
+                active
+                  ? "bg-primary text-white shadow-primary-glow"
+                  : takenBy
+                    ? "bg-white/[0.03] text-white/15 cursor-default"
+                    : "bg-white/[0.05] text-white/30 hover:bg-white/[0.10] hover:text-white/60"
+              }`}
+          >
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-function WorkoutCardSkeleton() {
+// ─── Template card ─────────────────────────────────────────────────────────────
+
+function TemplateCard({
+  template,
+  allTemplates,
+  onDelete,
+  onToggleDay,
+}: {
+  template: LocalWorkoutTemplate;
+  allTemplates: LocalWorkoutTemplate[];
+  onDelete: (id: string) => void;
+  onToggleDay: (templateId: string, day: number) => void;
+}) {
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+
+  const weekdays = template.weekdays ?? [];
+  const preview = template.exercises
+    .slice(0, 2)
+    .map((e) => e.name)
+    .join(" · ");
+  const remaining = template.exercises.length - 2;
+
   return (
-    <div className="h-20 rounded-2xl bg-[#1C2331] border border-gray-800 animate-pulse" />
+    <div className="group flex flex-col gap-4 p-4 rounded-3xl bg-card border border-white/[0.06] shadow-card hover:border-white/[0.10] transition-all duration-300 ease-out">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="w-9 h-9 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+          <Dumbbell size={15} className="text-primary/80" strokeWidth={2} />
+        </div>
+
+        {confirming ? (
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <button
+              onClick={() => onDelete(template.id)}
+              className="text-[11px] font-bold text-red-400 hover:text-red-300 px-2.5 py-1 rounded-full hover:bg-red-400/[0.08] transition-all duration-300"
+            >
+              Eliminar
+            </button>
+            <button
+              onClick={() => setConfirming(false)}
+              className="text-[11px] text-white/30 hover:text-white/60 px-2.5 py-1 rounded-full hover:bg-white/[0.05] transition-all duration-300"
+            >
+              No
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirming(true)}
+            className="opacity-0 group-hover:opacity-100 text-white/15 hover:text-red-400 transition-all duration-300 p-1.5 rounded-xl hover:bg-red-400/[0.07] active:scale-90"
+            aria-label="Eliminar"
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
+      </div>
+
+      {/* Name + preview */}
+      <div className="min-w-0 -mt-1">
+        <p className="font-bold text-sm text-white/90 leading-snug truncate">
+          {template.name}
+        </p>
+        <p className="text-[11px] text-white/30 mt-0.5 truncate leading-relaxed">
+          {preview}
+          {remaining > 0 && (
+            <span className="text-white/15"> +{remaining}</span>
+          )}
+        </p>
+        <p className="text-[10px] text-white/20 mt-1 font-medium">
+          {template.exercises.length} ejercicio
+          {template.exercises.length !== 1 ? "s" : ""}
+        </p>
+      </div>
+
+      {/* Day chips */}
+      <DayChips
+        templateId={template.id}
+        weekdays={weekdays}
+        allTemplates={allTemplates}
+        onToggle={(day) => onToggleDay(template.id, day)}
+      />
+
+      {/* CTA */}
+      <button
+        onClick={() => router.push(`/workouts/new?from=${template.id}`)}
+        className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-full bg-accent/10 hover:bg-accent/20 text-accent text-xs font-bold uppercase tracking-wide transition-all duration-300 ease-out active:scale-[0.97]"
+      >
+        <Play size={11} strokeWidth={0} fill="currentColor" />
+        Iniciar
+      </button>
+    </div>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+function TemplateCardSkeleton() {
+  return (
+    <div className="flex flex-col gap-4 p-4 rounded-3xl bg-card border border-white/[0.05] animate-pulse">
+      <div className="w-9 h-9 rounded-2xl bg-white/[0.04]" />
+      <div className="space-y-2">
+        <div className="h-3 bg-white/[0.04] rounded-full w-3/4" />
+        <div className="h-2 bg-white/[0.03] rounded-full w-full" />
+      </div>
+      <div className="flex gap-1">
+        {[...Array(7)].map((_, i) => (
+          <div key={i} className="w-6 h-6 rounded-full bg-white/[0.03]" />
+        ))}
+      </div>
+      <div className="h-9 bg-white/[0.03] rounded-full" />
+    </div>
+  );
+}
+
+// ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function WorkoutsPage() {
-  const { workouts, loading, isOffline, deleteWorkout } = useWorkouts();
+  const { templates, loading, deleteTemplate, patchTemplate } =
+    useWorkoutTemplates();
+
+  const handleToggleDay = async (templateId: string, day: number) => {
+    const template = templates.find((t) => t.id === templateId);
+    if (!template) return;
+
+    const current = template.weekdays ?? [];
+
+    if (current.includes(day)) {
+      await patchTemplate(templateId, {
+        weekdays: current.filter((d) => d !== day),
+      });
+    } else {
+      const owner = templates.find(
+        (t) => t.id !== templateId && t.weekdays?.includes(day),
+      );
+      if (owner) {
+        await patchTemplate(owner.id, {
+          weekdays: (owner.weekdays ?? []).filter((d) => d !== day),
+        });
+      }
+      await patchTemplate(templateId, { weekdays: [...current, day] });
+    }
+  };
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Entrenos</h1>
-        <div className="flex items-center gap-3">
-          {isOffline && (
-            <div className="flex items-center gap-1.5 text-xs text-yellow-400 bg-yellow-400/10 px-2.5 py-1 rounded-full border border-yellow-400/20">
-              <WifiOff size={12} />
-              <span>Offline</span>
-            </div>
-          )}
-          <Link
-            href="/workouts/new"
-            className="flex items-center gap-1.5 bg-primary text-[#0B0F17] text-sm font-bold px-4 py-2 rounded-xl active:scale-95 transition-transform"
-          >
-            <Plus size={16} />
-            Nuevo
-          </Link>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-white/90">
+            Rutinas
+          </h1>
+          <p className="text-xs text-white/30 mt-0.5">
+            {!loading && templates.length > 0
+              ? `${templates.length} plantilla${templates.length !== 1 ? "s" : ""}`
+              : "Elige o crea una rutina"}
+          </p>
         </div>
+
+        <Link
+          href="/workouts/templates/new"
+          className="flex items-center gap-1.5 bg-primary text-white text-sm font-bold px-5 py-2.5 rounded-full shadow-primary-glow hover:bg-primary/90 active:scale-[0.97] transition-all duration-300 ease-out"
+        >
+          <Plus size={14} strokeWidth={2.5} />
+          Nueva
+        </Link>
       </div>
 
+      {/* Hint */}
+      {!loading && templates.length > 0 && (
+        <p className="text-[11px] text-white/20">
+          Toca los días para planificar tu semana.
+        </p>
+      )}
+
+      {/* Loading */}
       {loading && (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <WorkoutCardSkeleton key={i} />
+        <div className="grid grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <TemplateCardSkeleton key={i} />
           ))}
         </div>
       )}
 
-      {!loading && workouts.length === 0 && (
-        <div className="p-8 rounded-2xl bg-[#1C2331] border border-gray-800 text-center space-y-4">
-          <p className="text-foreground/60 text-sm">
-            Aún no has registrado ningún entreno.
-          </p>
+      {/* Empty state */}
+      {!loading && templates.length === 0 && (
+        <div className="py-16 rounded-3xl bg-card border border-white/[0.05] flex flex-col items-center text-center px-6 gap-5">
+          <div className="w-14 h-14 rounded-2xl bg-primary/8 flex items-center justify-center">
+            <Dumbbell
+              size={24}
+              className="text-primary/50"
+              strokeWidth={1.75}
+            />
+          </div>
+          <div className="space-y-1">
+            <p className="font-bold text-white/50 text-sm">
+              Sin rutinas todavía
+            </p>
+            <p className="text-white/20 text-xs max-w-[200px]">
+              Crea tu primera rutina para empezar a entrenar.
+            </p>
+          </div>
           <Link
-            href="/workouts/new"
-            className="inline-flex items-center gap-2 bg-primary text-[#0B0F17] font-bold px-6 py-3 rounded-xl"
+            href="/workouts/templates/new"
+            className="inline-flex items-center gap-2 bg-primary text-white font-bold px-6 py-2.5 rounded-full shadow-primary-glow hover:bg-primary/90 active:scale-[0.97] transition-all duration-300 text-sm"
           >
-            <Plus size={16} />
-            Registrar primer entreno
+            <Plus size={14} strokeWidth={2.5} />
+            Crear rutina
           </Link>
         </div>
       )}
 
-      {!loading && workouts.length > 0 && (
-        <div className="space-y-3">
-          {workouts.map((w) => (
-            <WorkoutCard
-              key={w.local_id}
-              workout={w}
-              onDelete={deleteWorkout}
+      {/* Grid */}
+      {!loading && templates.length > 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          {templates.map((t) => (
+            <TemplateCard
+              key={t.id}
+              template={t}
+              allTemplates={templates}
+              onDelete={deleteTemplate}
+              onToggleDay={handleToggleDay}
             />
           ))}
         </div>

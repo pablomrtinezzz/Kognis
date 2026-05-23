@@ -165,34 +165,34 @@ export default function EditWorkoutPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-gray-800 -mx-4 md:-mx-8 px-4 md:px-8 py-3 mb-6 flex items-center justify-between">
+      <div className="sticky top-0 z-10 bg-background/85 backdrop-blur-2xl border-b border-white/[0.05] -mx-4 md:-mx-8 px-4 md:px-8 py-3 mb-8 flex items-center justify-between">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-foreground/60 hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-foreground/40 hover:text-foreground/80 transition-colors text-sm font-medium"
         >
-          <ArrowLeft size={20} />
-          <span className="text-sm">Entrenos</span>
+          <ArrowLeft size={17} strokeWidth={2} />
+          Entrenos
         </button>
         <button
           onClick={handleSave}
           disabled={exercises.length === 0 || saving}
-          className="flex items-center gap-1.5 bg-accent text-[#0B0F17] text-sm font-bold px-4 py-2 rounded-xl disabled:opacity-40 active:scale-95 transition-all"
+          className="flex items-center gap-1.5 bg-accent text-background text-sm font-semibold px-4 py-2 rounded-xl disabled:opacity-30 active:scale-95 transition-all shadow-[0_4px_16px_rgba(16,185,129,0.3)]"
         >
-          <CheckCircle size={16} />
+          <CheckCircle size={15} strokeWidth={2.5} />
           {saving ? "Guardando…" : "Guardar cambios"}
         </button>
       </div>
 
-      <div className="mb-8 space-y-1">
+      <div className="mb-8 space-y-1.5">
         <input
           type="text"
           value={workoutName}
           onChange={(e) => setWorkoutName(e.target.value)}
           placeholder="Nombre del entreno (opcional)"
-          className="w-full bg-transparent text-xl font-bold placeholder-foreground/20 focus:outline-none"
+          className="w-full bg-transparent text-2xl font-bold tracking-tight placeholder-foreground/15 focus:outline-none"
         />
         {startTime && (
-          <p className="text-xs text-foreground/40">
+          <p className="text-xs text-foreground/30 font-medium">
             Iniciado a las {startTime}
           </p>
         )}

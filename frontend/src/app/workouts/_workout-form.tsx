@@ -162,7 +162,7 @@ export const newExercise = (): DraftExercise => ({
   sets: [newSet()],
 });
 
-// ─── Exercise Combobox ─────────────────────────────────────────────────────────
+// ─── Exercise Combobox ────────────────────────────────────────────────────────
 
 interface ExerciseComboboxProps {
   value: string;
@@ -218,17 +218,17 @@ export function ExerciseCombobox({
         }
         placeholder="Ejercicio"
         autoFocus={autoFocus}
-        className="w-full bg-transparent font-semibold placeholder-foreground/30 focus:outline-none"
+        className="w-full bg-transparent text-sm font-semibold text-white/90 placeholder-white/20 focus:outline-none"
       />
 
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-xl bg-[#111827] border border-gray-700 shadow-2xl overflow-hidden">
+        <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl bg-[#111118]/95 backdrop-blur-xl border border-white/[0.07] shadow-float overflow-hidden">
           {isSearching ? (
             <div className="max-h-72 overflow-y-auto overscroll-contain">
               {Object.keys(searchGrouped).length > 0 ? (
                 Object.entries(searchGrouped).map(([muscle, names]) => (
                   <div key={muscle}>
-                    <p className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-foreground/40">
+                    <p className="px-4 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/25">
                       {muscle}
                     </p>
                     {names.map((name) => (
@@ -236,11 +236,12 @@ export function ExerciseCombobox({
                         key={name}
                         type="button"
                         onMouseDown={() => selectExercise(name)}
-                        className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                          value === name
-                            ? "bg-accent/20 text-accent font-semibold"
-                            : "hover:bg-white/5 text-foreground/80"
-                        }`}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition-all duration-200
+                          ${
+                            value === name
+                              ? "bg-accent/10 text-accent font-semibold"
+                              : "text-white/60 hover:bg-white/[0.05] hover:text-white/90"
+                          }`}
                       >
                         {name}
                       </button>
@@ -248,39 +249,40 @@ export function ExerciseCombobox({
                   </div>
                 ))
               ) : (
-                <p className="px-4 py-3 text-sm text-foreground/40 italic">
-                  Sin coincidencias — se guardará como ejercicio personalizado
+                <p className="px-4 py-4 text-sm text-white/30 italic">
+                  Sin coincidencias — se guardará como personalizado
                 </p>
               )}
             </div>
           ) : selectedMuscle ? (
             <>
-              <div className="sticky top-0 bg-[#111827] border-b border-gray-700/60 z-10">
+              <div className="sticky top-0 bg-[#111118]/98 border-b border-white/[0.05] z-10">
                 <button
                   type="button"
                   onMouseDown={(e) => {
                     e.preventDefault();
                     setSelectedMuscle(null);
                   }}
-                  className="flex items-center gap-1.5 w-full px-3 py-2.5 text-xs text-foreground/50 hover:text-foreground/80 transition-colors"
+                  className="flex items-center gap-2 w-full px-4 py-3 text-xs text-white/40 hover:text-white/70 transition-all duration-200"
                 >
                   ← Cambiar grupo muscular
                 </button>
-                <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-foreground/40">
+                <p className="px-4 pb-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/25">
                   {selectedMuscle}
                 </p>
               </div>
-              <div className="max-h-64 overflow-y-auto overscroll-contain pb-1">
+              <div className="max-h-64 overflow-y-auto overscroll-contain pb-2">
                 {muscleExercises.map((name) => (
                   <button
                     key={name}
                     type="button"
                     onMouseDown={() => selectExercise(name)}
-                    className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                      value === name
-                        ? "bg-accent/20 text-accent font-semibold"
-                        : "hover:bg-white/5 text-foreground/80"
-                    }`}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition-all duration-200
+                      ${
+                        value === name
+                          ? "bg-accent/10 text-accent font-semibold"
+                          : "text-white/60 hover:bg-white/[0.05] hover:text-white/90"
+                      }`}
                   >
                     {name}
                   </button>
@@ -288,11 +290,11 @@ export function ExerciseCombobox({
               </div>
             </>
           ) : (
-            <div className="max-h-72 overflow-y-auto overscroll-contain p-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/40 mb-2.5 px-1">
+            <div className="p-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/25 mb-3 px-1.5">
                 ¿Qué músculo trabajas?
               </p>
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-2 gap-1">
                 {Object.keys(EXERCISE_CATALOG).map((muscle) => (
                   <button
                     key={muscle}
@@ -301,7 +303,7 @@ export function ExerciseCombobox({
                       e.preventDefault();
                       setSelectedMuscle(muscle);
                     }}
-                    className="text-left px-3 py-2 rounded-lg text-sm text-foreground/70 hover:bg-white/5 hover:text-foreground transition-colors"
+                    className="text-left px-3 py-2.5 rounded-xl text-sm text-white/55 hover:bg-white/[0.06] hover:text-white/90 transition-all duration-200 font-medium"
                   >
                     {muscle}
                   </button>
@@ -349,8 +351,12 @@ export function ExerciseCard({
   onUpdateSet,
 }: ExerciseCardProps) {
   return (
-    <div className="rounded-2xl bg-[#1C2331] border border-gray-800">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800 rounded-t-2xl">
+    <div className="rounded-3xl bg-card border border-white/[0.06] shadow-card overflow-visible">
+      {/* Exercise header */}
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.05]">
+        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/20 tabular-nums shrink-0 w-4 text-center">
+          {exIdx + 1}
+        </span>
         <ExerciseCombobox
           value={ex.name}
           onChange={onUpdateName}
@@ -359,35 +365,37 @@ export function ExerciseCard({
         {!isOnly && (
           <button
             onClick={onRemoveExercise}
-            className="text-foreground/30 hover:text-red-400 transition-colors p-1 shrink-0"
+            className="text-white/15 hover:text-red-400 transition-all duration-300 ease-out p-1.5 rounded-xl hover:bg-red-400/[0.08] active:scale-90 shrink-0"
             aria-label="Eliminar ejercicio"
           >
-            <Trash2 size={16} />
+            <Trash2 size={14} />
           </button>
         )}
       </div>
 
-      <div className="grid grid-cols-[1.5rem_1fr_1fr_1.5rem_1.5rem] gap-2 px-4 pt-3 pb-1">
-        <span className="text-[10px] text-foreground/30 text-center font-semibold uppercase tracking-wide">
+      {/* Column headers */}
+      <div className="grid grid-cols-[1.75rem_1fr_1fr_1.75rem_1.75rem] gap-2 px-5 pt-4 pb-1.5">
+        <span className="text-[9px] text-white/20 text-center font-bold uppercase tracking-[0.1em]">
           #
         </span>
-        <span className="text-[10px] text-foreground/30 font-semibold uppercase tracking-wide">
+        <span className="text-[9px] text-white/20 font-bold uppercase tracking-[0.1em]">
           Reps
         </span>
-        <span className="text-[10px] text-foreground/30 font-semibold uppercase tracking-wide">
-          Peso (kg)
+        <span className="text-[9px] text-white/20 font-bold uppercase tracking-[0.1em]">
+          Peso kg
         </span>
         <span />
         <span />
       </div>
 
-      <div className="px-4 pb-3 space-y-2">
+      {/* Set rows */}
+      <div className="px-5 pb-4 space-y-2">
         {ex.sets.map((s, setIdx) => (
           <div
             key={s.localId}
-            className="grid grid-cols-[1.5rem_1fr_1fr_1.5rem_1.5rem] gap-2 items-center"
+            className="grid grid-cols-[1.75rem_1fr_1fr_1.75rem_1.75rem] gap-2 items-center"
           >
-            <span className="text-sm text-foreground/40 text-center font-mono">
+            <span className="text-xs text-white/25 text-center font-semibold tabular-nums">
               {setIdx + 1}
             </span>
             <input
@@ -396,8 +404,8 @@ export function ExerciseCard({
               min="0"
               value={s.reps}
               onChange={(e) => onUpdateSet(setIdx, "reps", e.target.value)}
-              placeholder="0"
-              className="w-full h-10 bg-background rounded-lg text-sm text-center font-mono focus:outline-none focus:ring-1 focus:ring-primary/50 transition-shadow"
+              placeholder="—"
+              className="w-full h-10 bg-white/[0.04] border border-white/[0.06] rounded-xl text-sm text-center font-semibold tabular-nums text-white/80 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/40 transition-all duration-300 placeholder:text-white/15 hover:bg-white/[0.06]"
             />
             <input
               type="number"
@@ -406,12 +414,12 @@ export function ExerciseCard({
               step="0.5"
               value={s.weightKg}
               onChange={(e) => onUpdateSet(setIdx, "weightKg", e.target.value)}
-              placeholder="0"
-              className="w-full h-10 bg-background rounded-lg text-sm text-center font-mono focus:outline-none focus:ring-1 focus:ring-primary/50 transition-shadow"
+              placeholder="—"
+              className="w-full h-10 bg-white/[0.04] border border-white/[0.06] rounded-xl text-sm text-center font-semibold tabular-nums text-white/80 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/40 transition-all duration-300 placeholder:text-white/15 hover:bg-white/[0.06]"
             />
             <button
               onClick={() => onCopySet(setIdx)}
-              className="flex items-center justify-center text-foreground/20 hover:text-accent transition-colors"
+              className="flex items-center justify-center text-white/15 hover:text-accent transition-all duration-300 ease-out active:scale-90"
               aria-label="Duplicar serie"
             >
               <Copy size={13} />
@@ -419,18 +427,19 @@ export function ExerciseCard({
             <button
               onClick={() => onRemoveSet(setIdx)}
               disabled={ex.sets.length === 1}
-              className="flex items-center justify-center text-foreground/20 hover:text-red-400 transition-colors disabled:pointer-events-none disabled:opacity-0"
+              className="flex items-center justify-center text-white/15 hover:text-red-400 transition-all duration-300 ease-out disabled:pointer-events-none disabled:opacity-0 active:scale-90"
               aria-label="Eliminar serie"
             >
-              <Trash2 size={14} />
+              <Trash2 size={13} />
             </button>
           </div>
         ))}
       </div>
 
+      {/* Add set */}
       <button
         onClick={onAddSet}
-        className="w-full py-3 text-sm font-semibold text-accent hover:bg-accent/5 border-t border-gray-800 transition-colors rounded-b-2xl"
+        className="w-full py-3.5 text-[11px] font-bold uppercase tracking-[0.1em] text-white/25 hover:text-accent hover:bg-accent/[0.04] border-t border-white/[0.05] transition-all duration-300 ease-out rounded-b-3xl"
       >
         + Añadir serie
       </button>
@@ -525,7 +534,7 @@ interface ExerciseListProps {
 export function ExerciseList({ exercises, actions }: ExerciseListProps) {
   return (
     <>
-      <div className="space-y-4">
+      <div className="space-y-3">
         {exercises.map((ex, exIdx) => (
           <ExerciseCard
             key={ex.localId}
@@ -547,11 +556,121 @@ export function ExerciseList({ exercises, actions }: ExerciseListProps) {
 
       <button
         onClick={actions.addExercise}
-        className="mt-4 w-full py-4 rounded-2xl border-2 border-dashed border-gray-700 hover:border-primary/50 text-foreground/40 hover:text-primary/60 transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+        className="mt-3 w-full py-4 rounded-3xl border border-dashed border-white/[0.07] hover:border-primary/25 text-white/25 hover:text-primary/60 hover:bg-primary/[0.03] transition-all duration-300 ease-out flex items-center justify-center gap-2 text-sm font-semibold active:scale-[0.98]"
       >
-        <Plus size={18} />
+        <Plus size={15} strokeWidth={2.5} />
         Añadir ejercicio
       </button>
     </>
   );
+}
+
+// ─── Workout templates ────────────────────────────────────────────────────────
+
+export interface WorkoutTemplate {
+  id: string;
+  label: string;
+  split: string;
+  exercises: { name: string; sets: number; reps: number }[];
+}
+
+export const WORKOUT_TEMPLATES: WorkoutTemplate[] = [
+  {
+    id: "push",
+    label: "Push",
+    split: "PPL",
+    exercises: [
+      { name: "Press banca", sets: 4, reps: 8 },
+      { name: "Press banca inclinado", sets: 3, reps: 10 },
+      { name: "Press militar con mancuernas", sets: 3, reps: 12 },
+      { name: "Elevaciones laterales", sets: 3, reps: 15 },
+      { name: "Extensión en polea alta (cuerda)", sets: 3, reps: 12 },
+    ],
+  },
+  {
+    id: "pull",
+    label: "Pull",
+    split: "PPL",
+    exercises: [
+      { name: "Dominadas (prono)", sets: 4, reps: 8 },
+      { name: "Remo con barra", sets: 4, reps: 8 },
+      { name: "Jalón al pecho", sets: 3, reps: 10 },
+      { name: "Curl con barra EZ", sets: 3, reps: 12 },
+      { name: "Curl martillo", sets: 3, reps: 12 },
+    ],
+  },
+  {
+    id: "legs",
+    label: "Legs",
+    split: "PPL",
+    exercises: [
+      { name: "Sentadilla libre", sets: 4, reps: 8 },
+      { name: "Prensa de piernas", sets: 3, reps: 10 },
+      { name: "Peso muerto rumano", sets: 3, reps: 10 },
+      { name: "Curl de femoral tumbado", sets: 3, reps: 12 },
+      { name: "Pantorrillas de pie", sets: 4, reps: 15 },
+    ],
+  },
+  {
+    id: "arnold-chest-back",
+    label: "Pecho & Espalda",
+    split: "Arnold",
+    exercises: [
+      { name: "Press banca", sets: 4, reps: 8 },
+      { name: "Aperturas con mancuernas", sets: 3, reps: 12 },
+      { name: "Dominadas (prono)", sets: 4, reps: 8 },
+      { name: "Remo con barra", sets: 4, reps: 8 },
+      { name: "Jalón al pecho", sets: 3, reps: 10 },
+    ],
+  },
+  {
+    id: "arnold-shoulders-arms",
+    label: "Hombros & Brazos",
+    split: "Arnold",
+    exercises: [
+      { name: "Press Arnold", sets: 4, reps: 10 },
+      { name: "Elevaciones laterales", sets: 3, reps: 15 },
+      { name: "Face pull", sets: 3, reps: 15 },
+      { name: "Curl con barra EZ", sets: 3, reps: 12 },
+      { name: "Extensión en polea alta (cuerda)", sets: 3, reps: 12 },
+    ],
+  },
+  {
+    id: "arnold-legs",
+    label: "Pierna",
+    split: "Arnold",
+    exercises: [
+      { name: "Sentadilla libre", sets: 4, reps: 8 },
+      { name: "Prensa de piernas", sets: 3, reps: 12 },
+      { name: "Peso muerto rumano", sets: 3, reps: 10 },
+      { name: "Curl de femoral tumbado", sets: 3, reps: 12 },
+      { name: "Pantorrillas de pie", sets: 4, reps: 15 },
+    ],
+  },
+  {
+    id: "full-body",
+    label: "Full Body",
+    split: "Full Body",
+    exercises: [
+      { name: "Sentadilla libre", sets: 3, reps: 8 },
+      { name: "Press banca", sets: 3, reps: 8 },
+      { name: "Peso muerto convencional", sets: 3, reps: 6 },
+      { name: "Press militar con barra", sets: 3, reps: 10 },
+      { name: "Remo con barra", sets: 3, reps: 8 },
+    ],
+  },
+];
+
+export function templateToExercises(
+  template: WorkoutTemplate,
+): DraftExercise[] {
+  return template.exercises.map(({ name, sets, reps }) => ({
+    localId: crypto.randomUUID(),
+    name,
+    sets: Array.from({ length: sets }, () => ({
+      localId: crypto.randomUUID(),
+      reps: String(reps),
+      weightKg: "",
+    })),
+  }));
 }

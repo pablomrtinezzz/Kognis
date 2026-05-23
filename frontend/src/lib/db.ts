@@ -11,6 +11,20 @@ export interface OfflineMutation {
 
 export type SyncStatus = "pending" | "syncing" | "synced" | "error";
 
+export interface TemplateExercise {
+  name: string;
+  sets: number;
+  reps: number;
+}
+
+export interface LocalWorkoutTemplate {
+  id: string;
+  name: string;
+  exercises: TemplateExercise[];
+  created_at: string;
+  weekdays?: number[]; // 0=Mon … 6=Sun (ISO week)
+}
+
 export interface LocalWorkout {
   local_id: string; // PK — client-generated UUID
   server_id?: string; // Populated after backend sync
@@ -51,6 +65,7 @@ export class KognisDatabase extends Dexie {
   workouts!: Table<LocalWorkout, string>;
   workout_exercises!: Table<LocalWorkoutExercise, string>;
   sets!: Table<LocalSet, string>;
+  workout_templates!: Table<LocalWorkoutTemplate, string>;
 
   constructor() {
     super("KognisDB");
@@ -83,6 +98,16 @@ export class KognisDatabase extends Dexie {
       workouts: "local_id, server_id, sync_status, user_id, started_at",
       workout_exercises: "local_id, workout_local_id, sync_status",
       sets: "local_id, workout_exercise_local_id, sync_status",
+    });
+
+    // v4 — add workout_templates table (user-editable reusable routines)
+    this.version(4).stores({
+      mutations: "++id, type, createdAt",
+      goals: "id, category",
+      workouts: "local_id, server_id, sync_status, user_id, started_at",
+      workout_exercises: "local_id, workout_local_id, sync_status",
+      sets: "local_id, workout_exercise_local_id, sync_status",
+      workout_templates: "id, name, created_at",
     });
   }
 }
