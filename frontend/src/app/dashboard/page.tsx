@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Flame,
@@ -15,6 +14,7 @@ import { useWorkoutTemplates } from "@/hooks/useWorkoutTemplates";
 import { useAuth } from "@/store/AuthContext";
 import { MuscularBalanceCard } from "@/components/MuscularBalance";
 import { GlassPanel } from "@/components/ui/GlassPanel";
+import Link from "next/link";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -55,18 +55,27 @@ function StatCard({
   icon: React.ElementType;
   accent: "primary" | "accent";
 }) {
-  const color = accent === "primary" ? "text-primary" : "text-accent";
-  const bg = accent === "primary" ? "bg-primary/[0.08]" : "bg-accent/[0.08]";
+  const isPrimary = accent === "primary";
+  const colorRgb = isPrimary ? "37,119,255" : "16,185,129";
 
   return (
     <GlassPanel glow className="p-5 flex flex-col gap-4">
       <div
-        className={`w-9 h-9 rounded-2xl ${bg} border border-white/[0.06] flex items-center justify-center`}
+        className="w-9 h-9 rounded-2xl flex items-center justify-center"
+        style={{
+          backgroundColor: `rgba(${colorRgb},0.08)`,
+          border: "1px solid rgba(255,255,255,0.06)",
+        }}
       >
-        <Icon size={16} className={color} strokeWidth={2} />
+        <Icon size={16} style={{ color: `rgb(${colorRgb})` }} strokeWidth={2} />
       </div>
       <div>
-        <p className={`text-3xl font-bold tracking-tight ${color}`}>{value}</p>
+        <p
+          className="text-3xl font-bold tracking-tight"
+          style={{ color: `rgb(${colorRgb})` }}
+        >
+          {value}
+        </p>
         <p className="text-xs text-white/35 mt-0.5 font-medium">{label}</p>
       </div>
     </GlassPanel>
@@ -86,17 +95,20 @@ function ProgressBar({ current, target }: { current: number; target: number }) {
           {current} / {target}
         </span>
         <span
-          className={`text-xs font-bold tabular-nums ${done ? "text-accent" : "text-white/40"}`}
+          className="text-xs font-bold tabular-nums"
+          style={{ color: done ? "rgb(16,185,129)" : "rgba(255,255,255,0.40)" }}
         >
           {Math.round(pct)}%
         </span>
       </div>
       <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-700 ease-out ${
-            done ? "bg-accent shadow-accent-glow" : "bg-primary"
-          }`}
-          style={{ width: `${pct}%` }}
+          className="h-full rounded-full transition-all duration-700 ease-out"
+          style={{
+            width: `${pct}%`,
+            backgroundColor: done ? "rgb(16,185,129)" : "rgb(37,119,255)",
+            ...(done ? { boxShadow: "0 0 12px rgba(16,185,129,0.45)" } : {}),
+          }}
         />
       </div>
     </div>
@@ -122,16 +134,17 @@ function GoalCard({ goal }: { goal: Goal }) {
               Límite:{" "}
               {new Date(goal.deadline + "T00:00:00").toLocaleDateString(
                 "es-ES",
-                {
-                  day: "numeric",
-                  month: "short",
-                },
+                { day: "numeric", month: "short" },
               )}
             </p>
           )}
         </div>
         <div
-          className={`flex items-center gap-1 shrink-0 ${goal.streak > 0 ? "text-accent" : "text-white/15"}`}
+          className="flex items-center gap-1 shrink-0"
+          style={{
+            color:
+              goal.streak > 0 ? "rgb(16,185,129)" : "rgba(255,255,255,0.15)",
+          }}
         >
           <Flame size={13} strokeWidth={2.5} />
           <span className="text-xs font-bold tabular-nums">{goal.streak}</span>
@@ -141,7 +154,10 @@ function GoalCard({ goal }: { goal: Goal }) {
       <ProgressBar current={goal.current_value} target={goal.target_value} />
 
       {done && (
-        <div className="flex items-center gap-1.5 text-accent text-xs font-bold">
+        <div
+          className="flex items-center gap-1.5 text-xs font-bold"
+          style={{ color: "rgb(16,185,129)" }}
+        >
           <CheckCircle2 size={13} strokeWidth={2.5} />
           Completado hoy
         </div>
@@ -177,10 +193,7 @@ function WeeklyGrid() {
     return (
       <div className="grid grid-cols-7 gap-1.5">
         {[...Array(7)].map((_, i) => (
-          <div
-            key={i}
-            className="h-[72px] rounded-2xl bg-card border border-white/[0.05] animate-pulse"
-          />
+          <GlassPanel key={i} className="h-[72px] animate-pulse" />
         ))}
       </div>
     );
@@ -192,6 +205,23 @@ function WeeklyGrid() {
         const isToday = index === todayIso;
         const isPast = index < todayIso;
 
+        // Compute inline styles per cell state to avoid any bg-card dependency
+        let cellStyle: React.CSSProperties = {};
+        let borderStyle: React.CSSProperties = {};
+        if (isToday && template) {
+          cellStyle = { backgroundColor: "rgba(37,119,255,0.10)" };
+          borderStyle = { borderColor: "rgba(37,119,255,0.25)" };
+        } else if (isToday) {
+          cellStyle = { backgroundColor: "rgba(255,255,255,0.04)" };
+          borderStyle = { borderColor: "rgba(255,255,255,0.10)" };
+        } else if (template) {
+          cellStyle = { backgroundColor: "rgba(17,17,24,0.6)" };
+          borderStyle = { borderColor: "rgba(255,255,255,0.07)" };
+        } else {
+          cellStyle = { backgroundColor: "rgba(17,17,24,0.4)" };
+          borderStyle = { borderColor: "rgba(255,255,255,0.04)" };
+        }
+
         return (
           <button
             key={index}
@@ -200,41 +230,38 @@ function WeeklyGrid() {
             onClick={() =>
               template && router.push(`/workouts/new?from=${template.id}`)
             }
-            className={`flex flex-col items-center gap-2 py-3 px-1 rounded-2xl border transition-all duration-300 ease-out
-              ${
-                isToday && template
-                  ? "bg-primary/[0.10] border-primary/25 hover:bg-primary/[0.16] active:scale-[0.96]"
-                  : isToday
-                    ? "bg-white/[0.04] border-white/[0.10]"
-                    : template
-                      ? "bg-card border-white/[0.07] hover:border-accent/25 hover:bg-accent/[0.05] active:scale-[0.96]"
-                      : "bg-card border-white/[0.04] cursor-default"
-              }`}
+            className="flex flex-col items-center gap-2 py-3 px-1 rounded-2xl border transition-all duration-300 ease-out"
+            style={{ ...cellStyle, ...borderStyle }}
           >
             <span
-              className={`text-[9px] font-bold uppercase tracking-wider ${isToday ? "text-primary" : "text-white/25"}`}
+              className="text-[9px] font-bold uppercase tracking-wider"
+              style={{
+                color: isToday ? "rgb(37,119,255)" : "rgba(255,255,255,0.25)",
+              }}
             >
               {DAY_LABELS[index]}
             </span>
             <span
-              className={`text-sm font-bold tabular-nums leading-none ${
-                isToday
-                  ? "text-primary"
+              className="text-sm font-bold tabular-nums leading-none"
+              style={{
+                color: isToday
+                  ? "rgb(37,119,255)"
                   : isPast
-                    ? "text-white/20"
-                    : "text-white/55"
-              }`}
+                    ? "rgba(255,255,255,0.20)"
+                    : "rgba(255,255,255,0.55)",
+              }}
             >
               {date.getDate()}
             </span>
             <div
-              className={`w-1.5 h-1.5 rounded-full ${
-                template
+              className="w-1.5 h-1.5 rounded-full"
+              style={{
+                backgroundColor: template
                   ? isToday
-                    ? "bg-primary"
-                    : "bg-accent/50"
-                  : "bg-transparent"
-              }`}
+                    ? "rgb(37,119,255)"
+                    : "rgba(16,185,129,0.50)"
+                  : "transparent",
+              }}
             />
           </button>
         );
@@ -257,12 +284,31 @@ function TodayWorkout() {
   return (
     <button
       onClick={() => router.push(`/workouts/new?from=${todayTemplate.id}`)}
-      className="w-full flex items-center gap-4 p-4 rounded-3xl bg-accent/[0.07] border border-accent/[0.15] hover:border-accent/30 hover:bg-accent/[0.11] transition-all duration-300 ease-out group active:scale-[0.99]"
+      className="w-full flex items-center gap-4 p-4 rounded-3xl transition-all duration-300 ease-out group active:scale-[0.99]"
+      style={{
+        backgroundColor: "rgba(16,185,129,0.07)",
+        border: "1px solid rgba(16,185,129,0.15)",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+          "rgba(16,185,129,0.11)";
+        (e.currentTarget as HTMLButtonElement).style.borderColor =
+          "rgba(16,185,129,0.30)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+          "rgba(16,185,129,0.07)";
+        (e.currentTarget as HTMLButtonElement).style.borderColor =
+          "rgba(16,185,129,0.15)";
+      }}
     >
-      <div className="w-10 h-10 rounded-2xl bg-accent/[0.15] flex items-center justify-center shrink-0 group-hover:bg-accent/20 transition-all duration-300">
+      <div
+        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-300"
+        style={{ backgroundColor: "rgba(16,185,129,0.15)" }}
+      >
         <Play
           size={15}
-          className="text-accent ml-0.5"
+          style={{ color: "rgb(16,185,129)", marginLeft: 2 }}
           strokeWidth={0}
           fill="currentColor"
         />
@@ -286,6 +332,7 @@ function TodayWorkout() {
 export default function DashboardPage() {
   const { goals, loading, isOffline } = useDashboardData();
   const { user } = useAuth();
+  const router = useRouter();
 
   const firstName = getFirstName(user?.user_metadata?.full_name);
   const totalStreak = goals.reduce((sum, g) => sum + g.streak, 0);
@@ -307,7 +354,14 @@ export default function DashboardPage() {
           </h1>
         </div>
         {isOffline && (
-          <div className="flex items-center gap-1.5 text-xs text-amber-400/90 bg-amber-500/[0.08] border border-amber-500/[0.15] px-3 py-1.5 rounded-full font-semibold mt-1">
+          <div
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-semibold mt-1"
+            style={{
+              color: "rgb(251,191,36)",
+              backgroundColor: "rgba(245,158,11,0.08)",
+              border: "1px solid rgba(245,158,11,0.15)",
+            }}
+          >
             <WifiOff size={10} />
             Offline
           </div>
@@ -387,10 +441,26 @@ export default function DashboardPage() {
         </p>
         <Link
           href="/workouts"
-          className="flex items-center gap-4 p-4 rounded-3xl bg-card border border-white/[0.06] shadow-card hover:border-primary/20 hover:bg-primary/[0.03] transition-all duration-300 ease-out group active:scale-[0.99]"
+          className="flex items-center gap-4 p-4 rounded-2xl transition-all duration-300 ease-out group active:scale-[0.99]"
+          style={{
+            background:
+              "linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow:
+              "0 0 0 1px rgba(255,255,255,0.05) inset, 0 8px 40px rgba(0,0,0,0.7)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+          }}
         >
-          <div className="w-10 h-10 rounded-2xl bg-primary/[0.10] flex items-center justify-center shrink-0 group-hover:bg-primary/[0.15] transition-all duration-300">
-            <Dumbbell size={16} className="text-primary" strokeWidth={2} />
+          <div
+            className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-300"
+            style={{ backgroundColor: "rgba(37,119,255,0.10)" }}
+          >
+            <Dumbbell
+              size={16}
+              style={{ color: "rgb(37,119,255)" }}
+              strokeWidth={2}
+            />
           </div>
           <div className="flex-1">
             <p className="font-bold text-sm text-white/90">Registrar entreno</p>
