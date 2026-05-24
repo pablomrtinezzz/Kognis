@@ -19,6 +19,7 @@ import {
 } from "recharts";
 import { useProgressData } from "@/hooks/useProgressData";
 import { useWorkoutTemplates } from "@/hooks/useWorkoutTemplates";
+import { GlassPanel } from "@/components/ui/GlassPanel";
 
 // ─── Generic dropdown ─────────────────────────────────────────────────────────
 
@@ -44,7 +45,14 @@ function Dropdown<T extends string>({
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-card border border-white/[0.07] text-sm font-semibold text-white/60 hover:text-white/90 hover:border-white/[0.12] transition-all duration-300 ease-out w-full active:scale-[0.99]"
+        className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-white/60 hover:text-white/90 transition-all duration-300 ease-out w-full active:scale-[0.99]"
+        style={{
+          background:
+            "linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
+          border: "1px solid rgba(255,255,255,0.07)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+        }}
       >
         <Icon size={14} className="text-primary/60 shrink-0" strokeWidth={2} />
         <span className="flex-1 text-left truncate">
@@ -57,7 +65,17 @@ function Dropdown<T extends string>({
       </button>
 
       {open && (
-        <div className="absolute top-full mt-2 left-0 right-0 z-50 rounded-2xl bg-[#111118]/95 backdrop-blur-xl border border-white/[0.07] shadow-float max-h-64 overflow-y-auto">
+        <div
+          className="absolute top-full mt-2 left-0 right-0 z-50 rounded-2xl max-h-64 overflow-y-auto"
+          style={{
+            backgroundColor: "rgba(11,11,20,0.95)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(255,255,255,0.07)",
+            boxShadow:
+              "0 20px 60px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.04) inset",
+          }}
+        >
           {options.map((opt) => (
             <button
               key={opt.value}
@@ -94,7 +112,16 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-[#111118]/95 backdrop-blur-xl border border-white/[0.08] rounded-2xl px-3.5 py-3 text-xs shadow-float">
+    <div
+      className="rounded-2xl px-3.5 py-3 text-xs"
+      style={{
+        backgroundColor: "rgba(11,11,20,0.95)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.9)",
+      }}
+    >
       <p className="text-white/35 mb-2 font-semibold">{label}</p>
       {payload.map((p) => (
         <p key={p.name} style={{ color: p.color }} className="font-bold">
@@ -117,7 +144,7 @@ function SuggestionCard({
   optionB: { reps: number; weightKg: number };
 }) {
   return (
-    <div className="rounded-3xl bg-card border border-white/[0.06] shadow-card overflow-hidden">
+    <GlassPanel glow className="overflow-hidden">
       <div className="px-5 pt-4 pb-3.5 border-b border-white/[0.05] flex items-center gap-3">
         <div className="w-9 h-9 rounded-2xl bg-accent/[0.10] flex items-center justify-center">
           <Zap size={15} className="text-accent" strokeWidth={2.5} />
@@ -152,7 +179,7 @@ function SuggestionCard({
           <p className="text-xs text-white/30 mt-1">× {optionB.reps} reps</p>
         </div>
       </div>
-    </div>
+    </GlassPanel>
   );
 }
 
@@ -160,7 +187,7 @@ function SuggestionCard({
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="py-14 rounded-3xl bg-card border border-white/[0.05] flex flex-col items-center text-center px-6 gap-4">
+    <GlassPanel className="py-14 flex flex-col items-center text-center px-6 gap-4">
       <div className="w-14 h-14 rounded-2xl bg-primary/[0.07] flex items-center justify-center">
         <TrendingUp size={22} className="text-primary/40" strokeWidth={1.75} />
       </div>
@@ -170,7 +197,7 @@ function EmptyState({ message }: { message: string }) {
           Registra sesiones para empezar a ver tu progreso.
         </p>
       </div>
-    </div>
+    </GlassPanel>
   );
 }
 
@@ -221,7 +248,6 @@ export default function ProgressPage() {
         </p>
       </div>
 
-      {/* Step 1 — select template */}
       {!templatesLoading && (
         <Dropdown
           value={selectedTemplateId}
@@ -232,7 +258,6 @@ export default function ProgressPage() {
         />
       )}
 
-      {/* Step 2 — select exercise */}
       {selectedTemplate && (
         <Dropdown
           value={selectedExercise}
@@ -243,29 +268,25 @@ export default function ProgressPage() {
         />
       )}
 
-      {/* Loading */}
-      {loading && (
-        <div className="h-52 rounded-3xl bg-card border border-white/[0.05] animate-pulse" />
-      )}
+      {loading && <GlassPanel className="h-52 animate-pulse" />}
 
-      {/* Prompts */}
       {!loading && !selectedTemplateId && (
         <EmptyState message="Elige una rutina para empezar" />
       )}
 
       {!loading && selectedTemplateId && !selectedExercise && (
-        <div className="py-10 rounded-3xl bg-card border border-white/[0.05] text-center">
+        <GlassPanel className="py-10 text-center">
           <p className="text-sm text-white/35">
             Selecciona un ejercicio de{" "}
             <span className="text-white/60 font-semibold">
               {selectedTemplate?.name}
             </span>
           </p>
-        </div>
+        </GlassPanel>
       )}
 
       {!loading && selectedExercise && !hasData && (
-        <div className="py-10 rounded-3xl bg-card border border-white/[0.05] text-center space-y-1">
+        <GlassPanel className="py-10 text-center space-y-1">
           <p className="text-sm text-white/40">
             Sin datos para{" "}
             <span className="text-white/65 font-semibold">
@@ -276,13 +297,12 @@ export default function ProgressPage() {
           <p className="text-xs text-white/20">
             Necesitas al menos 2 sesiones registradas.
           </p>
-        </div>
+        </GlassPanel>
       )}
 
-      {/* Chart */}
       {!loading && hasData && (
         <>
-          <div className="rounded-3xl bg-card border border-white/[0.06] shadow-card p-5">
+          <GlassPanel glow className="p-5">
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/25 mb-5">
               1RM estimado (Epley) · kg
             </p>
@@ -349,7 +369,7 @@ export default function ProgressPage() {
                 </span>
               </div>
             </div>
-          </div>
+          </GlassPanel>
 
           {suggestion && (
             <SuggestionCard
