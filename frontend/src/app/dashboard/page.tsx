@@ -58,7 +58,7 @@ function StatCard({
   const colorRgb = accent === "primary" ? "37,119,255" : "16,185,129";
 
   return (
-    <GlassPanel glow className="p-5 flex flex-col gap-4">
+    <GlassPanel glow className="h-full w-full flex flex-col p-5 gap-4">
       <div
         className="w-9 h-9 rounded-2xl flex items-center justify-center"
         style={{
@@ -94,24 +94,22 @@ function ProgressBar({ current, target }: { current: number; target: number }) {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-2">
+      <div className="flex justify-between items-center mb-1.5">
         <span
-          className="text-xs tabular-nums"
-          style={{ color: "rgba(255,255,255,0.35)" }}
+          className="text-[11px] tabular-nums"
+          style={{ color: "rgba(255,255,255,0.30)" }}
         >
           {current} / {target}
         </span>
         <span
-          className="text-xs font-bold tabular-nums"
-          style={{
-            color: done ? "rgb(16,185,129)" : "rgba(255,255,255,0.40)",
-          }}
+          className="text-[11px] font-bold tabular-nums"
+          style={{ color: done ? "rgb(16,185,129)" : "rgba(255,255,255,0.35)" }}
         >
           {Math.round(pct)}%
         </span>
       </div>
       <div
-        className="h-1 rounded-full overflow-hidden"
+        className="h-[3px] rounded-full overflow-hidden"
         style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
       >
         <div
@@ -119,7 +117,7 @@ function ProgressBar({ current, target }: { current: number; target: number }) {
           style={{
             width: `${pct}%`,
             backgroundColor: done ? "rgb(16,185,129)" : "rgb(37,119,255)",
-            ...(done ? { boxShadow: "0 0 12px rgba(16,185,129,0.45)" } : {}),
+            ...(done ? { boxShadow: "0 0 8px rgba(16,185,129,0.5)" } : {}),
           }}
         />
       </div>
@@ -127,67 +125,47 @@ function ProgressBar({ current, target }: { current: number; target: number }) {
   );
 }
 
-// ─── Goal card ────────────────────────────────────────────────────────────────
+// ─── Goal row (compact list item) ─────────────────────────────────────────────
 
-function GoalCard({ goal }: { goal: Goal }) {
-  const pct =
-    goal.target_value > 0
-      ? Math.min((goal.current_value / goal.target_value) * 100, 100)
-      : 0;
-  const done = pct >= 100;
+function GoalRow({ goal }: { goal: Goal }) {
+  const done = goal.target_value > 0 && goal.current_value >= goal.target_value;
 
   return (
-    <GlassPanel hover glow className="p-5 flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <p
-            className="font-bold capitalize text-sm"
-            style={{ color: "rgba(255,255,255,0.90)" }}
-          >
-            {goal.category}
-          </p>
-          {goal.deadline && (
-            <p
-              className="text-[11px] mt-0.5"
-              style={{ color: "rgba(255,255,255,0.25)" }}
-            >
-              Deadline:{" "}
-              {new Date(goal.deadline + "T00:00:00").toLocaleDateString(
-                "en-US",
-                { day: "numeric", month: "short" },
-              )}
-            </p>
-          )}
-        </div>
-        <div
-          className="flex items-center gap-1 shrink-0"
-          style={{
-            color:
-              goal.streak > 0 ? "rgb(16,185,129)" : "rgba(255,255,255,0.15)",
-          }}
+    <div
+      className="flex flex-col gap-2 p-3 rounded-xl"
+      style={{
+        backgroundColor: "rgba(255,255,255,0.03)",
+        border: "1px solid rgba(255,255,255,0.06)",
+      }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p
+          className="text-sm font-semibold capitalize truncate"
+          style={{ color: "rgba(255,255,255,0.80)" }}
         >
-          <Flame size={13} strokeWidth={2.5} />
-          <span className="text-xs font-bold tabular-nums">{goal.streak}</span>
+          {goal.category}
+        </p>
+        <div className="flex items-center gap-2 shrink-0">
+          {done && (
+            <CheckCircle2 size={12} style={{ color: "rgb(16,185,129)" }} />
+          )}
+          <div
+            className="flex items-center gap-1"
+            style={{
+              color:
+                goal.streak > 0 ? "rgb(16,185,129)" : "rgba(255,255,255,0.15)",
+            }}
+          >
+            <Flame size={11} strokeWidth={2.5} />
+            <span className="text-xs font-bold tabular-nums">
+              {goal.streak}
+            </span>
+          </div>
         </div>
       </div>
-
       <ProgressBar current={goal.current_value} target={goal.target_value} />
-
-      {done && (
-        <div
-          className="flex items-center gap-1.5 text-xs font-bold"
-          style={{ color: "rgb(16,185,129)" }}
-        >
-          <CheckCircle2 size={13} strokeWidth={2.5} />
-          Completed today
-        </div>
-      )}
-    </GlassPanel>
+    </div>
   );
-}
-
-function GoalCardSkeleton() {
-  return <GlassPanel className="h-[120px] animate-pulse" />;
 }
 
 // ─── Weekly grid ──────────────────────────────────────────────────────────────
@@ -211,16 +189,20 @@ function WeeklyGrid() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-7 gap-2">
         {[...Array(7)].map((_, i) => (
-          <GlassPanel key={i} className="h-[72px] animate-pulse" />
+          <div
+            key={i}
+            className="h-[76px] rounded-2xl animate-pulse"
+            style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
+          />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-7 gap-1.5">
+    <div className="grid grid-cols-7 gap-2">
       {days.map(({ index, date, template }) => {
         const isToday = index === todayIso;
         const isPast = index < todayIso;
@@ -229,15 +211,15 @@ function WeeklyGrid() {
         let cellBorder: string;
         if (isToday && template) {
           cellBg = "rgba(37,119,255,0.10)";
-          cellBorder = "rgba(37,119,255,0.25)";
+          cellBorder = "rgba(37,119,255,0.28)";
         } else if (isToday) {
           cellBg = "rgba(255,255,255,0.04)";
-          cellBorder = "rgba(255,255,255,0.10)";
+          cellBorder = "rgba(255,255,255,0.12)";
         } else if (template) {
-          cellBg = "rgba(17,17,24,0.6)";
+          cellBg = "rgba(255,255,255,0.03)";
           cellBorder = "rgba(255,255,255,0.07)";
         } else {
-          cellBg = "rgba(17,17,24,0.4)";
+          cellBg = "transparent";
           cellBorder = "rgba(255,255,255,0.04)";
         }
 
@@ -266,7 +248,7 @@ function WeeklyGrid() {
                 color: isToday
                   ? "rgb(37,119,255)"
                   : isPast
-                    ? "rgba(255,255,255,0.20)"
+                    ? "rgba(255,255,255,0.18)"
                     : "rgba(255,255,255,0.55)",
               }}
             >
@@ -278,7 +260,7 @@ function WeeklyGrid() {
                 backgroundColor: template
                   ? isToday
                     ? "rgb(37,119,255)"
-                    : "rgba(16,185,129,0.50)"
+                    : "rgba(16,185,129,0.55)"
                   : "transparent",
               }}
             />
@@ -289,69 +271,147 @@ function WeeklyGrid() {
   );
 }
 
-function TodayWorkout() {
+// ─── Today's workout bento card ───────────────────────────────────────────────
+
+function TodayWorkoutCard() {
   const router = useRouter();
   const { templates, loading } = useWorkoutTemplates();
 
-  if (loading) return null;
+  if (loading) {
+    return <GlassPanel className="h-full min-h-[140px] animate-pulse" />;
+  }
 
   const todayTemplate = templates.find((t) =>
     t.weekdays?.includes(isoDay(new Date())),
   );
-  if (!todayTemplate) return null;
+
+  if (!todayTemplate) {
+    return (
+      <GlassPanel className="h-full w-full flex flex-col p-5">
+        <h3
+          className="text-xs font-bold uppercase tracking-widest mb-4"
+          style={{ color: "rgba(255,255,255,0.50)" }}
+        >
+          {"Today's Workout"}
+        </h3>
+        <div
+          className="flex-1 flex items-center justify-center text-sm font-medium"
+          style={{ color: "rgba(255,255,255,0.20)" }}
+        >
+          Rest day — nothing scheduled
+        </div>
+      </GlassPanel>
+    );
+  }
 
   return (
-    <button
+    <GlassPanel
+      hover
+      glow
+      className="h-full w-full flex flex-col p-5 cursor-pointer"
       onClick={() => router.push(`/workouts/new?from=${todayTemplate.id}`)}
-      className="w-full flex items-center gap-4 p-4 rounded-3xl transition-all duration-300 ease-out active:scale-[0.99]"
-      style={{
-        backgroundColor: "rgba(16,185,129,0.07)",
-        border: "1px solid rgba(16,185,129,0.15)",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-          "rgba(16,185,129,0.11)";
-        (e.currentTarget as HTMLButtonElement).style.borderColor =
-          "rgba(16,185,129,0.30)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-          "rgba(16,185,129,0.07)";
-        (e.currentTarget as HTMLButtonElement).style.borderColor =
-          "rgba(16,185,129,0.15)";
-      }}
     >
-      <div
-        className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
-        style={{ backgroundColor: "rgba(16,185,129,0.15)" }}
+      <h3
+        className="text-xs font-bold uppercase tracking-widest mb-4"
+        style={{ color: "rgba(255,255,255,0.50)" }}
       >
-        <Play
-          size={15}
-          style={{ color: "rgb(16,185,129)", marginLeft: 2 }}
-          strokeWidth={0}
-          fill="currentColor"
+        {"Today's Workout"}
+      </h3>
+      <div className="flex-1 flex items-center gap-4">
+        <div
+          className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+          style={{ backgroundColor: "rgba(16,185,129,0.15)" }}
+        >
+          <Play
+            size={16}
+            style={{ color: "rgb(16,185,129)", marginLeft: 2 }}
+            strokeWidth={0}
+            fill="currentColor"
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p
+            className="font-bold text-base leading-tight"
+            style={{ color: "rgba(255,255,255,0.90)" }}
+          >
+            {todayTemplate.name}
+          </p>
+          <p
+            className="text-xs mt-1"
+            style={{ color: "rgba(255,255,255,0.35)" }}
+          >
+            {todayTemplate.exercises.length} exercises
+          </p>
+        </div>
+        <ChevronRight
+          size={16}
+          className="shrink-0"
+          style={{ color: "rgba(255,255,255,0.20)" }}
         />
       </div>
-      <div className="flex-1 text-left">
-        <p
-          className="font-bold text-sm"
-          style={{ color: "rgba(255,255,255,0.90)" }}
+    </GlassPanel>
+  );
+}
+
+// ─── Goals bento card ─────────────────────────────────────────────────────────
+
+function GoalsCard({
+  goals,
+  loading,
+  goalsOnTrack,
+}: {
+  goals: Goal[];
+  loading: boolean;
+  goalsOnTrack: number;
+}) {
+  return (
+    <GlassPanel glow className="h-full w-full flex flex-col p-5">
+      <div className="flex items-center justify-between mb-4 shrink-0">
+        <h3
+          className="text-xs font-bold uppercase tracking-widest"
+          style={{ color: "rgba(255,255,255,0.50)" }}
         >
-          {todayTemplate.name}
-        </p>
-        <p
-          className="text-xs mt-0.5"
-          style={{ color: "rgba(255,255,255,0.35)" }}
-        >
-          {"Today's workout"} · {todayTemplate.exercises.length} exercises
-        </p>
+          Active Goals
+        </h3>
+        {!loading && goals.length > 0 && (
+          <span
+            className="text-xs font-bold tabular-nums"
+            style={{ color: "rgb(16,185,129)" }}
+          >
+            {goalsOnTrack}/{goals.length} done
+          </span>
+        )}
       </div>
-      <ChevronRight
-        size={15}
-        className="shrink-0 transition-all duration-300"
-        style={{ color: "rgba(255,255,255,0.15)" }}
-      />
-    </button>
+
+      {loading && (
+        <div className="flex flex-col gap-2 flex-1">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-[60px] rounded-xl animate-pulse"
+              style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
+            />
+          ))}
+        </div>
+      )}
+
+      {!loading && goals.length === 0 && (
+        <div
+          className="flex-1 flex items-center justify-center text-sm font-medium"
+          style={{ color: "rgba(255,255,255,0.20)" }}
+        >
+          No active goals yet
+        </div>
+      )}
+
+      {!loading && goals.length > 0 && (
+        <div className="flex flex-col gap-2 flex-1 overflow-y-auto">
+          {goals.map((goal) => (
+            <GoalRow key={goal.id} goal={goal} />
+          ))}
+        </div>
+      )}
+    </GlassPanel>
   );
 }
 
@@ -368,8 +428,8 @@ export default function DashboardPage() {
   ).length;
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
+    <div className="space-y-6">
+      {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <p
@@ -401,138 +461,102 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Weekly plan */}
-      <GlassPanel glow className="p-4">
-        <p
-          className="text-[10px] font-bold uppercase tracking-[0.12em] mb-3"
-          style={{ color: "rgba(255,255,255,0.25)" }}
-        >
-          Weekly plan
-        </p>
-        <WeeklyGrid />
-      </GlassPanel>
+      {/* ── Bento grid ── */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        {/* ─ Row 1: Weekly plan (8) + Muscular balance (4) ─ */}
 
-      {/* Today's workout */}
-      <TodayWorkout />
+        <div className="md:col-span-8 lg:col-span-8 flex flex-col">
+          <GlassPanel glow className="h-full w-full flex flex-col p-5">
+            <h3
+              className="text-xs font-bold uppercase tracking-widest mb-4 shrink-0"
+              style={{ color: "rgba(255,255,255,0.50)" }}
+            >
+              Weekly Plan
+            </h3>
+            <WeeklyGrid />
+          </GlassPanel>
+        </div>
 
-      {/* Stats — 1 col mobile, 2 md, 3 lg */}
-      {!loading && goals.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="md:col-span-4 lg:col-span-4 flex flex-col">
+          <MuscularBalanceCard />
+        </div>
+
+        {/* ─ Row 2: Today's workout (6) + Goals (6) ─ */}
+
+        <div className="md:col-span-6 lg:col-span-6 flex flex-col">
+          <TodayWorkoutCard />
+        </div>
+
+        <div className="md:col-span-6 lg:col-span-6 flex flex-col">
+          <GoalsCard
+            goals={goals}
+            loading={loading}
+            goalsOnTrack={goalsOnTrack}
+          />
+        </div>
+
+        {/* ─ Row 3: Stats (4 each) + Quick access (4) ─ */}
+
+        <div className="md:col-span-4 flex flex-col">
           <StatCard
             label="Total streak"
             value={totalStreak}
             icon={Flame}
             accent="accent"
           />
+        </div>
+
+        <div className="md:col-span-4 flex flex-col">
           <StatCard
             label="Goals today"
-            value={`${goalsOnTrack}/${goals.length}`}
+            value={goals.length > 0 ? `${goalsOnTrack}/${goals.length}` : "—"}
             icon={CheckCircle2}
             accent="primary"
           />
-          <StatCard
-            label="Workouts"
-            value="Log"
-            icon={Dumbbell}
-            accent="primary"
-          />
         </div>
-      )}
 
-      {/* Muscular balance */}
-      <MuscularBalanceCard />
-
-      {/* Goals — 1 col mobile, 2 md, 3 lg */}
-      <div>
-        <p
-          className="text-[10px] font-bold uppercase tracking-[0.12em] mb-4"
-          style={{ color: "rgba(255,255,255,0.25)" }}
-        >
-          Active goals
-        </p>
-
-        {loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {[1, 2, 3].map((i) => (
-              <GoalCardSkeleton key={i} />
-            ))}
-          </div>
-        )}
-
-        {!loading && goals.length === 0 && (
-          <GlassPanel glow className="p-8 text-center space-y-1.5">
-            <p
-              className="text-sm font-medium"
-              style={{ color: "rgba(255,255,255,0.35)" }}
+        <div className="md:col-span-4 flex flex-col">
+          <Link href="/workouts" className="flex flex-col h-full">
+            <GlassPanel
+              hover
+              glow
+              className="h-full w-full flex flex-col p-5 gap-4"
             >
-              No active goals.
-            </p>
-            <p className="text-xs" style={{ color: "rgba(255,255,255,0.20)" }}>
-              Create one to start tracking your progress.
-            </p>
-          </GlassPanel>
-        )}
-
-        {!loading && goals.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {goals.map((goal) => (
-              <GoalCard key={goal.id} goal={goal} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Quick access */}
-      <div>
-        <p
-          className="text-[10px] font-bold uppercase tracking-[0.12em] mb-4"
-          style={{ color: "rgba(255,255,255,0.25)" }}
-        >
-          Quick access
-        </p>
-        <Link
-          href="/workouts"
-          className="flex items-center gap-4 p-4 rounded-2xl transition-all duration-300 ease-out active:scale-[0.99]"
-          style={{
-            background:
-              "linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            boxShadow:
-              "0 25px 50px -12px rgba(0,0,0,1), 0 0 0 1px rgba(255,255,255,0.05) inset",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)",
-          }}
-        >
-          <div
-            className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
-            style={{ backgroundColor: "rgba(37,119,255,0.10)" }}
-          >
-            <Dumbbell
-              size={16}
-              style={{ color: "rgb(37,119,255)" }}
-              strokeWidth={2}
-            />
-          </div>
-          <div className="flex-1">
-            <p
-              className="font-bold text-sm"
-              style={{ color: "rgba(255,255,255,0.90)" }}
-            >
-              Log workout
-            </p>
-            <p
-              className="text-xs mt-0.5"
-              style={{ color: "rgba(255,255,255,0.30)" }}
-            >
-              Pick a routine and start your session
-            </p>
-          </div>
-          <ChevronRight
-            size={15}
-            className="shrink-0 transition-all duration-300"
-            style={{ color: "rgba(255,255,255,0.15)" }}
-          />
-        </Link>
+              <div
+                className="w-9 h-9 rounded-2xl flex items-center justify-center"
+                style={{
+                  backgroundColor: "rgba(37,119,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <Dumbbell
+                  size={16}
+                  style={{ color: "rgb(37,119,255)" }}
+                  strokeWidth={2}
+                />
+              </div>
+              <div>
+                <p
+                  className="text-lg font-bold tracking-tight"
+                  style={{ color: "rgba(255,255,255,0.90)" }}
+                >
+                  Log workout
+                </p>
+                <p
+                  className="text-xs mt-0.5 font-medium"
+                  style={{ color: "rgba(255,255,255,0.35)" }}
+                >
+                  Pick a routine and start
+                </p>
+              </div>
+              <ChevronRight
+                size={14}
+                className="mt-auto self-end"
+                style={{ color: "rgba(255,255,255,0.20)" }}
+              />
+            </GlassPanel>
+          </Link>
+        </div>
       </div>
     </div>
   );
