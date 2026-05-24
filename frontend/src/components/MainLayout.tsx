@@ -40,7 +40,7 @@ const SIDEBAR_STYLE: React.CSSProperties = {
     "linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)",
   backdropFilter: "blur(30px)",
   WebkitBackdropFilter: "blur(30px)",
-  borderRight: "1px solid rgba(255,255,255,0.05)",
+  borderRight: "1px solid rgba(255,255,255,0.08)",
   zIndex: 50,
 };
 
@@ -49,7 +49,7 @@ const BOTTOM_NAV_STYLE: React.CSSProperties = {
     "linear-gradient(0deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)",
   backdropFilter: "blur(30px)",
   WebkitBackdropFilter: "blur(30px)",
-  borderTop: "1px solid rgba(255,255,255,0.05)",
+  borderTop: "1px solid rgba(255,255,255,0.08)",
 };
 
 export default function MainLayout({
@@ -65,7 +65,7 @@ export default function MainLayout({
 
   return (
     <div
-      className="relative min-h-screen w-full md:grid"
+      className="relative min-h-screen w-full max-w-none md:grid"
       style={{
         gridTemplateColumns: showNav ? "80px 1fr" : "1fr",
         color: "rgb(242,244,248)",
@@ -86,7 +86,7 @@ export default function MainLayout({
           }}
         >
           <FlaskConical size={10} strokeWidth={2.5} />
-          Dev Mode
+          Hola Pablo
         </div>
       )}
 
@@ -109,13 +109,14 @@ export default function MainLayout({
 
           <nav className="flex flex-col items-center gap-1 w-full px-3">
             {NAV_ITEMS.map(({ name, href, icon: Icon }) => {
-              const isActive = pathname.startsWith(href);
+              const isActive =
+                pathname === href || pathname.startsWith(href + "/");
               return (
                 <Link
                   key={href}
                   href={href}
                   title={name}
-                  className="relative w-full h-12 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all duration-300 ease-out"
+                  className="group relative w-full h-12 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all duration-300 ease-out"
                   style={{
                     backgroundColor: isActive
                       ? "rgba(37,119,255,0.08)"
@@ -150,8 +151,9 @@ export default function MainLayout({
                       style={ACTIVE_DOT}
                     />
                   )}
-                  {/* Icon with soft glow when active */}
+                  {/* Icon — scales up on hover, glows when active */}
                   <span
+                    className="transition-transform duration-300 ease-out group-hover:scale-[1.18]"
                     style={
                       isActive ? { filter: ACTIVE_ICON_FILTER } : undefined
                     }
@@ -189,7 +191,8 @@ export default function MainLayout({
         >
           <ul className="flex h-16 items-stretch px-1">
             {NAV_ITEMS.map(({ name, href, icon: Icon }) => {
-              const isActive = pathname.startsWith(href);
+              const isActive =
+                pathname === href || pathname.startsWith(href + "/");
               return (
                 <li key={href} className="flex-1 relative">
                   <Link

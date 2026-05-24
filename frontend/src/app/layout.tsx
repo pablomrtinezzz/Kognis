@@ -26,7 +26,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" className={inter.variable} suppressHydrationWarning>
+    <html
+      lang="es"
+      className={`${inter.variable} w-full`}
+      suppressHydrationWarning
+    >
       <body
         className="antialiased w-full"
         style={{

@@ -274,7 +274,7 @@ export default function NewTemplatePage() {
   };
 
   return (
-    <div className="max-w-xl mx-auto">
+    <div className="w-full max-w-none flex-1 flex flex-col px-4 md:px-10">
       {/* ── Sticky header ── */}
       <div className="sticky top-0 z-10 -mx-4 md:-mx-8 px-4 md:px-8 py-3 mb-8 flex items-center justify-between bg-background/80 backdrop-blur-2xl border-b border-white/[0.05]">
         <button

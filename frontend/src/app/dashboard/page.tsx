@@ -42,6 +42,31 @@ function startOfWeek(ref: Date): Date {
   return d;
 }
 
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+function SkeletonCard() {
+  return (
+    <GlassPanel className="h-full w-full animate-pulse">
+      <div className="p-6 space-y-4">
+        <div
+          className="w-9 h-9 rounded-2xl"
+          style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
+        />
+        <div className="space-y-2">
+          <div
+            className="h-8 w-14 rounded-lg"
+            style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
+          />
+          <div
+            className="h-3 w-20 rounded"
+            style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
+          />
+        </div>
+      </div>
+    </GlassPanel>
+  );
+}
+
 // ─── Stat card ────────────────────────────────────────────────────────────────
 
 function StatCard({
@@ -58,7 +83,7 @@ function StatCard({
   const colorRgb = accent === "primary" ? "37,119,255" : "16,185,129";
 
   return (
-    <GlassPanel glow className="h-full w-full flex flex-col p-5 gap-4">
+    <GlassPanel glow className="h-full w-full flex flex-col p-6 gap-4">
       <div
         className="w-9 h-9 rounded-2xl flex items-center justify-center"
         style={{
@@ -287,7 +312,7 @@ function TodayWorkoutCard() {
 
   if (!todayTemplate) {
     return (
-      <GlassPanel className="h-full w-full flex flex-col p-5">
+      <GlassPanel className="h-full w-full flex flex-col p-6">
         <h3
           className="text-xs font-bold uppercase tracking-widest mb-4"
           style={{ color: "rgba(255,255,255,0.50)" }}
@@ -308,7 +333,7 @@ function TodayWorkoutCard() {
     <GlassPanel
       hover
       glow
-      className="h-full w-full flex flex-col p-5 cursor-pointer"
+      className="h-full w-full flex flex-col p-6 cursor-pointer"
       onClick={() => router.push(`/workouts/new?from=${todayTemplate.id}`)}
     >
       <h3
@@ -365,7 +390,7 @@ function GoalsCard({
   goalsOnTrack: number;
 }) {
   return (
-    <GlassPanel glow className="h-full w-full flex flex-col p-5">
+    <GlassPanel glow className="h-full w-full flex flex-col p-6">
       <div className="flex items-center justify-between mb-4 shrink-0">
         <h3
           className="text-xs font-bold uppercase tracking-widest"
@@ -465,8 +490,8 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* ─ Row 1: Weekly plan (8) + Muscular balance (4) ─ */}
 
-        <div className="md:col-span-8 lg:col-span-8 flex flex-col">
-          <GlassPanel glow className="h-full w-full flex flex-col p-5">
+        <div className="md:col-span-8 lg:col-span-8 flex flex-col h-full">
+          <GlassPanel glow className="h-full w-full flex flex-col p-6">
             <h3
               className="text-xs font-bold uppercase tracking-widest mb-4 shrink-0"
               style={{ color: "rgba(255,255,255,0.50)" }}
@@ -477,17 +502,17 @@ export default function DashboardPage() {
           </GlassPanel>
         </div>
 
-        <div className="md:col-span-4 lg:col-span-4 flex flex-col">
+        <div className="md:col-span-4 lg:col-span-4 flex flex-col h-full">
           <MuscularBalanceCard />
         </div>
 
         {/* ─ Row 2: Today's workout (6) + Goals (6) ─ */}
 
-        <div className="md:col-span-6 lg:col-span-6 flex flex-col">
+        <div className="md:col-span-6 lg:col-span-6 flex flex-col h-full">
           <TodayWorkoutCard />
         </div>
 
-        <div className="md:col-span-6 lg:col-span-6 flex flex-col">
+        <div className="md:col-span-6 lg:col-span-6 flex flex-col h-full">
           <GoalsCard
             goals={goals}
             loading={loading}
@@ -497,30 +522,38 @@ export default function DashboardPage() {
 
         {/* ─ Row 3: Stats (4 each) + Quick access (4) ─ */}
 
-        <div className="md:col-span-4 flex flex-col">
-          <StatCard
-            label="Total streak"
-            value={totalStreak}
-            icon={Flame}
-            accent="accent"
-          />
+        <div className="md:col-span-4 flex flex-col h-full">
+          {loading ? (
+            <SkeletonCard />
+          ) : (
+            <StatCard
+              label="Total streak"
+              value={totalStreak}
+              icon={Flame}
+              accent="accent"
+            />
+          )}
         </div>
 
-        <div className="md:col-span-4 flex flex-col">
-          <StatCard
-            label="Goals today"
-            value={goals.length > 0 ? `${goalsOnTrack}/${goals.length}` : "—"}
-            icon={CheckCircle2}
-            accent="primary"
-          />
+        <div className="md:col-span-4 flex flex-col h-full">
+          {loading ? (
+            <SkeletonCard />
+          ) : (
+            <StatCard
+              label="Goals today"
+              value={goals.length > 0 ? `${goalsOnTrack}/${goals.length}` : "—"}
+              icon={CheckCircle2}
+              accent="primary"
+            />
+          )}
         </div>
 
-        <div className="md:col-span-4 flex flex-col">
+        <div className="md:col-span-4 flex flex-col h-full">
           <Link href="/workouts" className="flex flex-col h-full">
             <GlassPanel
               hover
               glow
-              className="h-full w-full flex flex-col p-5 gap-4"
+              className="h-full w-full flex flex-col p-6 gap-4"
             >
               <div
                 className="w-9 h-9 rounded-2xl flex items-center justify-center"

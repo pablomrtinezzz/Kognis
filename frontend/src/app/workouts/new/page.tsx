@@ -13,8 +13,6 @@ import {
 } from "../_workout-form";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 
-// ─── Inner page ───────────────────────────────────────────────────────────────
-
 function NewWorkoutInner() {
   const router = useRouter();
   const { user } = useAuth();
@@ -80,13 +78,14 @@ function NewWorkoutInner() {
 
       await db.workouts.put({
         local_id: workoutLocalId,
-        user_id: user!.id,
+        user_id: user?.id ?? "local-user",
         name: workoutName.trim() || undefined,
         started_at: startedAt.current,
         finished_at: finishedAt,
         sync_status: "pending",
       });
 
+      let orderIdx = 0;
       for (let i = 0; i < exercises.length; i++) {
         const ex = exercises[i];
         await db.workout_exercises.put({
@@ -94,8 +93,9 @@ function NewWorkoutInner() {
           workout_local_id: workoutLocalId,
           exercise_name: ex.name.trim(),
           order_index: i,
-          sync_status: "pending",
+          sync_status: "pending", // <--- AÑADE ESTO
         });
+
         for (let j = 0; j < ex.sets.length; j++) {
           const s = ex.sets[j];
           await db.sets.put({
@@ -104,30 +104,27 @@ function NewWorkoutInner() {
             set_number: j + 1,
             reps: s.reps ? parseInt(s.reps, 10) : undefined,
             weight_kg: s.weightKg ? parseFloat(s.weightKg) : undefined,
-            sync_status: "pending",
+            sync_status: "pending", // <--- AÑADE ESTO TAMBIÉN
           });
         }
       }
 
-      router.push("/progress");
-    } catch {
-      setError("Could not save workout. Please try again.");
+      router.replace("/workouts");
+    } catch (e) {
+      setError("Failed to save workout locally.");
       setSaving(false);
     }
   };
 
-  const startTime = new Date(startedAt.current).toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  if (templateLoading) return null;
 
   return (
-    <div className="w-full">
-      {/* ── Sticky header — full width ── */}
+    <div className="w-full max-w-none flex-1 flex flex-col">
+      {/* ── Sticky header ── */}
       <div
-        className="sticky top-0 z-20 -mx-4 md:-mx-10 px-4 md:px-10 py-3 mb-6 flex items-center justify-between"
+        className="sticky top-0 z-20 px-4 md:px-8 py-4 mb-6 flex items-center justify-between"
         style={{
-          backgroundColor: "rgba(9,9,14,0.88)",
+          backgroundColor: "rgba(9, 9, 14, 0.88)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
           borderBottom: "1px solid rgba(255,255,255,0.05)",
@@ -135,144 +132,80 @@ function NewWorkoutInner() {
       >
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-1.5 text-sm font-medium transition-all duration-300 ease-out active:scale-[0.96]"
-          style={{ color: "rgba(255,255,255,0.40)" }}
-          onMouseEnter={(e) =>
-            ((e.currentTarget as HTMLButtonElement).style.color =
-              "rgba(255,255,255,0.80)")
-          }
-          onMouseLeave={(e) =>
-            ((e.currentTarget as HTMLButtonElement).style.color =
-              "rgba(255,255,255,0.40)")
-          }
+          className="flex items-center gap-1.5 text-white/40 hover:text-white/80 transition-all duration-300 text-sm font-medium"
         >
           <ArrowLeft size={16} strokeWidth={2} />
-          Back
+          Rutinas
         </button>
         <button
           onClick={handleSave}
-          disabled={exercises.length === 0 || saving || templateLoading}
-          className="flex items-center gap-1.5 text-sm font-bold px-5 py-2 rounded-full disabled:opacity-30 active:scale-[0.96] transition-all duration-300 ease-out"
-          style={{
-            backgroundColor: "rgb(16,185,129)",
-            color: "rgb(0,0,0)",
-            boxShadow: "0 8px 24px -4px rgba(16,185,129,0.40)",
-          }}
+          disabled={saving}
+          className="flex items-center gap-2 bg-primary text-white text-sm font-bold px-6 py-2.5 rounded-full disabled:opacity-30 active:scale-[0.96] transition-all shadow-[0_0_20px_rgba(37,119,255,0.3)]"
         >
-          <CheckCircle size={14} strokeWidth={2.5} />
-          {saving ? "Saving…" : "Finish workout"}
+          <CheckCircle size={15} strokeWidth={2.5} />
+          {saving ? "Guardando..." : "Terminar Entreno"}
         </button>
       </div>
 
-      {/* ── 2-column body ── */}
-      <div className="flex flex-col md:grid md:grid-cols-[340px_1fr] gap-6 items-start">
-        {/* ─ LEFT: sticky workout overview ─ */}
-        <div className="md:sticky md:top-20 flex flex-col gap-4">
-          {/* Workout info */}
-          <GlassPanel glow className="p-5 flex flex-col gap-2">
-            <input
-              type="text"
-              value={workoutName}
-              onChange={(e) => setWorkoutName(e.target.value)}
-              placeholder="Workout name"
-              className="w-full bg-transparent text-xl font-bold tracking-tight placeholder:text-white/15 focus:outline-none"
-              style={{ color: "rgba(255,255,255,0.90)" }}
-            />
-            <p
-              className="text-xs font-medium tabular-nums"
-              style={{ color: "rgba(255,255,255,0.25)" }}
-            >
-              Started at {startTime}
-            </p>
-          </GlassPanel>
-
-          {/* Exercise overview — live summary */}
-          {!templateLoading && exercises.length > 0 && (
-            <GlassPanel className="p-4 flex flex-col gap-2">
-              <h3
-                className="text-xs font-bold uppercase tracking-widest mb-1"
-                style={{ color: "rgba(255,255,255,0.50)" }}
-              >
-                Exercises · {exercises.length}
-              </h3>
-              {exercises.map((ex, i) => (
-                <div
-                  key={ex.localId}
-                  className="flex items-center gap-3 px-2.5 py-2 rounded-xl"
-                  style={{
-                    backgroundColor: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.05)",
-                  }}
-                >
-                  <span
-                    className="text-[10px] font-bold tabular-nums shrink-0"
-                    style={{ color: "rgba(255,255,255,0.20)" }}
-                  >
-                    {i + 1}
-                  </span>
-                  <span
-                    className="flex-1 text-sm font-medium truncate"
-                    style={{
-                      color: ex.name
-                        ? "rgba(255,255,255,0.70)"
-                        : "rgba(255,255,255,0.20)",
-                    }}
-                  >
-                    {ex.name || "—"}
-                  </span>
-                  <span
-                    className="text-[11px] font-semibold tabular-nums shrink-0"
-                    style={{ color: "rgba(255,255,255,0.30)" }}
-                  >
-                    {ex.sets.length} sets
-                  </span>
-                </div>
-              ))}
+      {/* ── Desktop Two-Column Grid ── */}
+      <div className="flex-1 md:grid md:grid-cols-[360px_1fr] gap-8 px-4 md:px-8 pb-12">
+        {/* Left Column: Summary & Info (Sticky on Desktop) */}
+        <div className="mb-8 md:mb-0">
+          <div className="md:sticky md:top-24 flex flex-col gap-6">
+            <GlassPanel className="p-6">
+              <input
+                type="text"
+                value={workoutName}
+                onChange={(e) => setWorkoutName(e.target.value)}
+                placeholder="Nombre del entreno (Opcional)"
+                className="w-full bg-transparent text-2xl font-bold tracking-tight text-white/90 placeholder-white/20 focus:outline-none"
+              />
+              <p className="text-xs text-white/30 mt-2 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                Grabando sesión
+              </p>
             </GlassPanel>
-          )}
+
+            <GlassPanel glow className="p-6">
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/40 mb-4">
+                Resumen Activo
+              </h3>
+              <ul className="space-y-3">
+                {exercises.map((ex, idx) => (
+                  <li
+                    key={ex.localId}
+                    className="flex justify-between items-center text-sm"
+                  >
+                    <span className="text-white/70 truncate mr-4">
+                      {ex.name || `Ejercicio ${idx + 1}`}
+                    </span>
+                    <span className="text-white/30 font-mono text-xs shrink-0">
+                      {ex.sets.length} sets
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </GlassPanel>
+            {error && (
+              <p className="text-sm text-red-400 font-medium text-center bg-red-500/10 py-3 rounded-xl border border-red-500/20">
+                {error}
+              </p>
+            )}
+          </div>
         </div>
 
-        {/* ─ RIGHT: exercise cards ─ */}
-        <div className="w-full">
-          {templateLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <GlassPanel key={i} className="h-[140px] animate-pulse" />
-              ))}
-            </div>
-          ) : (
-            <>
-              <ExerciseList exercises={exercises} actions={actions} />
-              {error && (
-                <p
-                  className="mt-4 text-sm text-center font-medium"
-                  style={{ color: "rgba(248,113,113,0.90)" }}
-                >
-                  {error}
-                </p>
-              )}
-            </>
-          )}
-          <div className="h-10" />
+        {/* Right Column: Execution Area */}
+        <div className="flex flex-col gap-6">
+          <ExerciseList exercises={exercises} actions={actions} />
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Suspense wrapper ─────────────────────────────────────────────────────────
-
 export default function NewWorkoutPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="w-full space-y-3 pt-16">
-          {[1, 2, 3].map((i) => (
-            <GlassPanel key={i} className="h-[140px] animate-pulse" />
-          ))}
-        </div>
-      }
-    >
+    <Suspense>
       <NewWorkoutInner />
     </Suspense>
   );

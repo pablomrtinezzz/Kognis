@@ -79,7 +79,7 @@ export function ExerciseCombobox({
     left: 0,
     right: 0,
     top: "calc(100% + 8px)",
-    zIndex: 50,
+    zIndex: 9999,
     borderRadius: "1rem",
     overflow: "hidden",
     backgroundColor: "rgba(10,10,18,0.97)",
@@ -583,8 +583,12 @@ interface ExerciseListProps {
 
 export function ExerciseList({ exercises, actions }: ExerciseListProps) {
   return (
-    <>
-      <div className="space-y-3">
+    <div className="flex flex-col">
+      {/* Scrollable exercise cards — scrollbars hidden via globals.css */}
+      <div
+        className="overflow-y-auto overscroll-contain space-y-3"
+        style={{ scrollbarWidth: "none" }}
+      >
         {exercises.map((ex, exIdx) => (
           <ExerciseCard
             key={ex.localId}
@@ -631,7 +635,7 @@ export function ExerciseList({ exercises, actions }: ExerciseListProps) {
         <Plus size={15} strokeWidth={2.5} />
         Add exercise
       </button>
-    </>
+    </div>
   );
 }
 
