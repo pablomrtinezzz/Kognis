@@ -11,8 +11,9 @@ import {
   newExercise,
   useExerciseActions,
 } from "../_workout-form";
+import { GlassPanel } from "@/components/ui/GlassPanel";
 
-// ─── Inner page (uses useSearchParams — must be inside Suspense) ───────────────
+// ─── Inner page ───────────────────────────────────────────────────────────────
 
 function NewWorkoutInner() {
   const router = useRouter();
@@ -64,11 +65,11 @@ function NewWorkoutInner() {
     setError(null);
 
     if (exercises.some((ex) => !ex.name.trim())) {
-      setError("Todos los ejercicios deben tener un nombre.");
+      setError("All exercises must have a name.");
       return;
     }
     if (exercises.some((ex) => ex.sets.length === 0)) {
-      setError("Cada ejercicio debe tener al menos una serie.");
+      setError("Each exercise must have at least one set.");
       return;
     }
 
@@ -110,73 +111,151 @@ function NewWorkoutInner() {
 
       router.push("/progress");
     } catch {
-      setError("No se pudo guardar el entreno. Inténtalo de nuevo.");
+      setError("Could not save workout. Please try again.");
       setSaving(false);
     }
   };
 
-  const startTime = new Date(startedAt.current).toLocaleTimeString("es-ES", {
+  const startTime = new Date(startedAt.current).toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
   });
 
   return (
-    <div className="max-w-xl mx-auto">
-      {/* ── Sticky header ── */}
-      <div className="sticky top-0 z-10 -mx-4 md:-mx-8 px-4 md:px-8 py-3 mb-8 flex items-center justify-between bg-background/80 backdrop-blur-2xl border-b border-white/[0.05]">
+    <div className="w-full">
+      {/* ── Sticky header — full width ── */}
+      <div
+        className="sticky top-0 z-20 -mx-4 md:-mx-10 px-4 md:px-10 py-3 mb-6 flex items-center justify-between"
+        style={{
+          backgroundColor: "rgba(9,9,14,0.88)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          borderBottom: "1px solid rgba(255,255,255,0.05)",
+        }}
+      >
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-1.5 text-white/40 hover:text-white/80 transition-all duration-300 ease-out text-sm font-medium active:scale-[0.96]"
+          className="flex items-center gap-1.5 text-sm font-medium transition-all duration-300 ease-out active:scale-[0.96]"
+          style={{ color: "rgba(255,255,255,0.40)" }}
+          onMouseEnter={(e) =>
+            ((e.currentTarget as HTMLButtonElement).style.color =
+              "rgba(255,255,255,0.80)")
+          }
+          onMouseLeave={(e) =>
+            ((e.currentTarget as HTMLButtonElement).style.color =
+              "rgba(255,255,255,0.40)")
+          }
         >
           <ArrowLeft size={16} strokeWidth={2} />
-          Rutinas
+          Back
         </button>
         <button
           onClick={handleSave}
           disabled={exercises.length === 0 || saving || templateLoading}
-          className="flex items-center gap-1.5 bg-accent text-black text-sm font-bold px-5 py-2 rounded-full disabled:opacity-30 active:scale-[0.96] transition-all duration-300 ease-out shadow-accent-glow"
+          className="flex items-center gap-1.5 text-sm font-bold px-5 py-2 rounded-full disabled:opacity-30 active:scale-[0.96] transition-all duration-300 ease-out"
+          style={{
+            backgroundColor: "rgb(16,185,129)",
+            color: "rgb(0,0,0)",
+            boxShadow: "0 8px 24px -4px rgba(16,185,129,0.40)",
+          }}
         >
           <CheckCircle size={14} strokeWidth={2.5} />
-          {saving ? "Guardando…" : "Finalizar"}
+          {saving ? "Saving…" : "Finish workout"}
         </button>
       </div>
 
-      {/* ── Title ── */}
-      <div className="mb-8 space-y-1">
-        <input
-          type="text"
-          value={workoutName}
-          onChange={(e) => setWorkoutName(e.target.value)}
-          placeholder="Nombre del entreno"
-          className="w-full bg-transparent text-2xl font-bold tracking-tight text-white/90 placeholder-white/15 focus:outline-none"
-        />
-        <p className="text-xs text-white/25 font-medium tabular-nums">
-          Iniciado a las {startTime}
-        </p>
-      </div>
-
-      {/* ── Loading skeleton ── */}
-      {templateLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-[140px] rounded-3xl bg-card border border-white/[0.05] animate-pulse"
+      {/* ── 2-column body ── */}
+      <div className="flex flex-col md:grid md:grid-cols-[340px_1fr] gap-6 items-start">
+        {/* ─ LEFT: sticky workout overview ─ */}
+        <div className="md:sticky md:top-20 flex flex-col gap-4">
+          {/* Workout info */}
+          <GlassPanel glow className="p-5 flex flex-col gap-2">
+            <input
+              type="text"
+              value={workoutName}
+              onChange={(e) => setWorkoutName(e.target.value)}
+              placeholder="Workout name"
+              className="w-full bg-transparent text-xl font-bold tracking-tight placeholder:text-white/15 focus:outline-none"
+              style={{ color: "rgba(255,255,255,0.90)" }}
             />
-          ))}
-        </div>
-      ) : (
-        <>
-          <ExerciseList exercises={exercises} actions={actions} />
-          {error && (
-            <p className="mt-4 text-sm text-red-400/90 text-center font-medium">
-              {error}
+            <p
+              className="text-xs font-medium tabular-nums"
+              style={{ color: "rgba(255,255,255,0.25)" }}
+            >
+              Started at {startTime}
             </p>
-          )}
-        </>
-      )}
+          </GlassPanel>
 
-      <div className="h-10" />
+          {/* Exercise overview — live summary */}
+          {!templateLoading && exercises.length > 0 && (
+            <GlassPanel className="p-4 flex flex-col gap-2">
+              <h3
+                className="text-xs font-bold uppercase tracking-widest mb-1"
+                style={{ color: "rgba(255,255,255,0.50)" }}
+              >
+                Exercises · {exercises.length}
+              </h3>
+              {exercises.map((ex, i) => (
+                <div
+                  key={ex.localId}
+                  className="flex items-center gap-3 px-2.5 py-2 rounded-xl"
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.05)",
+                  }}
+                >
+                  <span
+                    className="text-[10px] font-bold tabular-nums shrink-0"
+                    style={{ color: "rgba(255,255,255,0.20)" }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span
+                    className="flex-1 text-sm font-medium truncate"
+                    style={{
+                      color: ex.name
+                        ? "rgba(255,255,255,0.70)"
+                        : "rgba(255,255,255,0.20)",
+                    }}
+                  >
+                    {ex.name || "—"}
+                  </span>
+                  <span
+                    className="text-[11px] font-semibold tabular-nums shrink-0"
+                    style={{ color: "rgba(255,255,255,0.30)" }}
+                  >
+                    {ex.sets.length} sets
+                  </span>
+                </div>
+              ))}
+            </GlassPanel>
+          )}
+        </div>
+
+        {/* ─ RIGHT: exercise cards ─ */}
+        <div className="w-full">
+          {templateLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <GlassPanel key={i} className="h-[140px] animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <>
+              <ExerciseList exercises={exercises} actions={actions} />
+              {error && (
+                <p
+                  className="mt-4 text-sm text-center font-medium"
+                  style={{ color: "rgba(248,113,113,0.90)" }}
+                >
+                  {error}
+                </p>
+              )}
+            </>
+          )}
+          <div className="h-10" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -187,12 +266,9 @@ export default function NewWorkoutPage() {
   return (
     <Suspense
       fallback={
-        <div className="max-w-xl mx-auto space-y-3 pt-16">
+        <div className="w-full space-y-3 pt-16">
           {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-[140px] rounded-3xl bg-card border border-white/[0.05] animate-pulse"
-            />
+            <GlassPanel key={i} className="h-[140px] animate-pulse" />
           ))}
         </div>
       }

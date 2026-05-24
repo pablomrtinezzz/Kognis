@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Copy, Plus, Trash2 } from "lucide-react";
 import { EXERCISE_CATALOG, ALL_EXERCISES } from "@/lib/exercises";
+import { GlassPanel } from "@/components/ui/GlassPanel";
 
 export { EXERCISE_CATALOG, ALL_EXERCISES };
 
@@ -73,6 +74,30 @@ export function ExerciseCombobox({
     setOpen(false);
   };
 
+  const DROPDOWN_STYLE: React.CSSProperties = {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: "calc(100% + 8px)",
+    zIndex: 50,
+    borderRadius: "1rem",
+    overflow: "hidden",
+    backgroundColor: "rgba(10,10,18,0.97)",
+    backdropFilter: "blur(24px)",
+    WebkitBackdropFilter: "blur(24px)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    boxShadow:
+      "0 25px 50px -12px rgba(0,0,0,1), 0 0 0 1px rgba(255,255,255,0.04) inset",
+  };
+
+  const STICKY_HEADER_STYLE: React.CSSProperties = {
+    position: "sticky",
+    top: 0,
+    backgroundColor: "rgba(10,10,18,0.99)",
+    borderBottom: "1px solid rgba(255,255,255,0.05)",
+    zIndex: 10,
+  };
+
   return (
     <div className="relative flex-1 min-w-0">
       <input
@@ -86,19 +111,22 @@ export function ExerciseCombobox({
             setSelectedMuscle(null);
           }, 150)
         }
-        placeholder="Ejercicio"
+        placeholder="Exercise"
         autoFocus={autoFocus}
         className="w-full bg-transparent text-sm font-semibold text-white/90 placeholder-white/20 focus:outline-none"
       />
 
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl bg-[#111118]/95 backdrop-blur-xl border border-white/[0.07] shadow-float overflow-hidden">
+        <div style={DROPDOWN_STYLE}>
           {isSearching ? (
             <div className="max-h-72 overflow-y-auto overscroll-contain">
               {Object.keys(searchGrouped).length > 0 ? (
                 Object.entries(searchGrouped).map(([muscle, names]) => (
                   <div key={muscle}>
-                    <p className="px-4 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/25">
+                    <p
+                      className="px-4 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em]"
+                      style={{ color: "rgba(255,255,255,0.25)" }}
+                    >
                       {muscle}
                     </p>
                     {names.map((name) => (
@@ -106,12 +134,28 @@ export function ExerciseCombobox({
                         key={name}
                         type="button"
                         onMouseDown={() => selectExercise(name)}
-                        className={`w-full text-left px-4 py-2.5 text-sm transition-all duration-200
-                          ${
-                            value === name
-                              ? "bg-accent/10 text-accent font-semibold"
-                              : "text-white/60 hover:bg-white/[0.05] hover:text-white/90"
-                          }`}
+                        className="w-full text-left px-4 py-2.5 text-sm transition-all duration-200"
+                        style={
+                          value === name
+                            ? {
+                                backgroundColor: "rgba(16,185,129,0.08)",
+                                color: "rgb(16,185,129)",
+                                fontWeight: 600,
+                              }
+                            : { color: "rgba(255,255,255,0.60)" }
+                        }
+                        onMouseEnter={(e) => {
+                          if (value !== name)
+                            (
+                              e.currentTarget as HTMLButtonElement
+                            ).style.backgroundColor = "rgba(255,255,255,0.04)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (value !== name)
+                            (
+                              e.currentTarget as HTMLButtonElement
+                            ).style.backgroundColor = "transparent";
+                        }}
                       >
                         {name}
                       </button>
@@ -119,25 +163,32 @@ export function ExerciseCombobox({
                   </div>
                 ))
               ) : (
-                <p className="px-4 py-4 text-sm text-white/30 italic">
-                  Sin coincidencias — se guardará como personalizado
+                <p
+                  className="px-4 py-4 text-sm italic"
+                  style={{ color: "rgba(255,255,255,0.30)" }}
+                >
+                  No matches — will be saved as custom
                 </p>
               )}
             </div>
           ) : selectedMuscle ? (
             <>
-              <div className="sticky top-0 bg-[#111118]/98 border-b border-white/[0.05] z-10">
+              <div style={STICKY_HEADER_STYLE}>
                 <button
                   type="button"
                   onMouseDown={(e) => {
                     e.preventDefault();
                     setSelectedMuscle(null);
                   }}
-                  className="flex items-center gap-2 w-full px-4 py-3 text-xs text-white/40 hover:text-white/70 transition-all duration-200"
+                  className="flex items-center gap-2 w-full px-4 py-3 text-xs transition-all duration-200"
+                  style={{ color: "rgba(255,255,255,0.40)" }}
                 >
-                  ← Cambiar grupo muscular
+                  ← Change muscle group
                 </button>
-                <p className="px-4 pb-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/25">
+                <p
+                  className="px-4 pb-2.5 text-[10px] font-bold uppercase tracking-[0.12em]"
+                  style={{ color: "rgba(255,255,255,0.25)" }}
+                >
                   {selectedMuscle}
                 </p>
               </div>
@@ -147,12 +198,28 @@ export function ExerciseCombobox({
                     key={name}
                     type="button"
                     onMouseDown={() => selectExercise(name)}
-                    className={`w-full text-left px-4 py-2.5 text-sm transition-all duration-200
-                      ${
-                        value === name
-                          ? "bg-accent/10 text-accent font-semibold"
-                          : "text-white/60 hover:bg-white/[0.05] hover:text-white/90"
-                      }`}
+                    className="w-full text-left px-4 py-2.5 text-sm transition-all duration-200"
+                    style={
+                      value === name
+                        ? {
+                            backgroundColor: "rgba(16,185,129,0.08)",
+                            color: "rgb(16,185,129)",
+                            fontWeight: 600,
+                          }
+                        : { color: "rgba(255,255,255,0.60)" }
+                    }
+                    onMouseEnter={(e) => {
+                      if (value !== name)
+                        (
+                          e.currentTarget as HTMLButtonElement
+                        ).style.backgroundColor = "rgba(255,255,255,0.04)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (value !== name)
+                        (
+                          e.currentTarget as HTMLButtonElement
+                        ).style.backgroundColor = "transparent";
+                    }}
                   >
                     {name}
                   </button>
@@ -161,8 +228,11 @@ export function ExerciseCombobox({
             </>
           ) : (
             <div className="p-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/25 mb-3 px-1.5">
-                ¿Qué músculo trabajas?
+              <p
+                className="text-[10px] font-bold uppercase tracking-[0.12em] mb-3 px-1.5"
+                style={{ color: "rgba(255,255,255,0.25)" }}
+              >
+                Which muscle group?
               </p>
               <div className="grid grid-cols-2 gap-1">
                 {Object.keys(EXERCISE_CATALOG).map((muscle) => (
@@ -173,7 +243,22 @@ export function ExerciseCombobox({
                       e.preventDefault();
                       setSelectedMuscle(muscle);
                     }}
-                    className="text-left px-3 py-2.5 rounded-xl text-sm text-white/55 hover:bg-white/[0.06] hover:text-white/90 transition-all duration-200 font-medium"
+                    className="text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
+                    style={{ color: "rgba(255,255,255,0.55)" }}
+                    onMouseEnter={(e) => {
+                      (
+                        e.currentTarget as HTMLButtonElement
+                      ).style.backgroundColor = "rgba(255,255,255,0.06)";
+                      (e.currentTarget as HTMLButtonElement).style.color =
+                        "rgba(255,255,255,0.90)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (
+                        e.currentTarget as HTMLButtonElement
+                      ).style.backgroundColor = "transparent";
+                      (e.currentTarget as HTMLButtonElement).style.color =
+                        "rgba(255,255,255,0.55)";
+                    }}
                   >
                     {muscle}
                   </button>
@@ -219,9 +304,16 @@ export function ExerciseCard({
   onUpdateSet,
 }: ExerciseCardProps) {
   return (
-    <div className="rounded-3xl bg-card border border-white/[0.06] shadow-card overflow-visible">
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.05]">
-        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/20 tabular-nums shrink-0 w-4 text-center">
+    <GlassPanel style={{ overflow: "visible", borderRadius: "1.5rem" }}>
+      {/* Exercise name row */}
+      <div
+        className="flex items-center gap-3 px-5 py-4"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+      >
+        <span
+          className="text-[10px] font-bold uppercase tracking-[0.12em] tabular-nums shrink-0 w-4 text-center"
+          style={{ color: "rgba(255,255,255,0.20)" }}
+        >
           {exIdx + 1}
         </span>
         <ExerciseCombobox
@@ -232,35 +324,62 @@ export function ExerciseCard({
         {!isOnly && (
           <button
             onClick={onRemoveExercise}
-            className="text-white/15 hover:text-red-400 transition-all duration-300 ease-out p-1.5 rounded-xl hover:bg-red-400/[0.08] active:scale-90 shrink-0"
-            aria-label="Eliminar ejercicio"
+            className="transition-all duration-300 ease-out p-1.5 rounded-xl active:scale-90 shrink-0"
+            style={{ color: "rgba(255,255,255,0.15)" }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.color =
+                "rgb(248,113,113)";
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                "rgba(248,113,113,0.08)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.color =
+                "rgba(255,255,255,0.15)";
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                "transparent";
+            }}
+            aria-label="Remove exercise"
           >
             <Trash2 size={14} />
           </button>
         )}
       </div>
 
+      {/* Column headers */}
       <div className="grid grid-cols-[1.75rem_1fr_1fr_1.75rem_1.75rem] gap-2 px-5 pt-4 pb-1.5">
-        <span className="text-[9px] text-white/20 text-center font-bold uppercase tracking-[0.1em]">
+        <span
+          className="text-[9px] text-center font-bold uppercase tracking-[0.1em]"
+          style={{ color: "rgba(255,255,255,0.20)" }}
+        >
           #
         </span>
-        <span className="text-[9px] text-white/20 font-bold uppercase tracking-[0.1em]">
+        <span
+          className="text-[9px] font-bold uppercase tracking-[0.1em]"
+          style={{ color: "rgba(255,255,255,0.20)" }}
+        >
           Reps
         </span>
-        <span className="text-[9px] text-white/20 font-bold uppercase tracking-[0.1em]">
-          Peso kg
+        <span
+          className="text-[9px] font-bold uppercase tracking-[0.1em]"
+          style={{ color: "rgba(255,255,255,0.20)" }}
+        >
+          Weight kg
         </span>
         <span />
         <span />
       </div>
 
+      {/* Set rows */}
       <div className="px-5 pb-4 space-y-2">
         {ex.sets.map((s, setIdx) => (
           <div
             key={s.localId}
             className="grid grid-cols-[1.75rem_1fr_1fr_1.75rem_1.75rem] gap-2 items-center"
           >
-            <span className="text-xs text-white/25 text-center font-semibold tabular-nums">
+            <span
+              className="text-xs text-center font-semibold tabular-nums"
+              style={{ color: "rgba(255,255,255,0.25)" }}
+            >
               {setIdx + 1}
             </span>
             <input
@@ -270,7 +389,23 @@ export function ExerciseCard({
               value={s.reps}
               onChange={(e) => onUpdateSet(setIdx, "reps", e.target.value)}
               placeholder="—"
-              className="w-full h-10 bg-white/[0.04] border border-white/[0.06] rounded-xl text-sm text-center font-semibold tabular-nums text-white/80 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/40 transition-all duration-300 placeholder:text-white/15 hover:bg-white/[0.06]"
+              className="w-full h-10 rounded-xl text-sm text-center font-semibold tabular-nums focus:outline-none transition-all duration-300 placeholder:text-white/15"
+              style={{
+                backgroundColor: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.07)",
+                color: "rgba(255,255,255,0.80)",
+              }}
+              onFocus={(e) => {
+                (e.currentTarget as HTMLInputElement).style.borderColor =
+                  "rgba(37,119,255,0.45)";
+                (e.currentTarget as HTMLInputElement).style.boxShadow =
+                  "0 0 0 3px rgba(37,119,255,0.10)";
+              }}
+              onBlur={(e) => {
+                (e.currentTarget as HTMLInputElement).style.borderColor =
+                  "rgba(255,255,255,0.07)";
+                (e.currentTarget as HTMLInputElement).style.boxShadow = "none";
+              }}
             />
             <input
               type="number"
@@ -280,20 +415,54 @@ export function ExerciseCard({
               value={s.weightKg}
               onChange={(e) => onUpdateSet(setIdx, "weightKg", e.target.value)}
               placeholder="—"
-              className="w-full h-10 bg-white/[0.04] border border-white/[0.06] rounded-xl text-sm text-center font-semibold tabular-nums text-white/80 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/40 transition-all duration-300 placeholder:text-white/15 hover:bg-white/[0.06]"
+              className="w-full h-10 rounded-xl text-sm text-center font-semibold tabular-nums focus:outline-none transition-all duration-300 placeholder:text-white/15"
+              style={{
+                backgroundColor: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.07)",
+                color: "rgba(255,255,255,0.80)",
+              }}
+              onFocus={(e) => {
+                (e.currentTarget as HTMLInputElement).style.borderColor =
+                  "rgba(37,119,255,0.45)";
+                (e.currentTarget as HTMLInputElement).style.boxShadow =
+                  "0 0 0 3px rgba(37,119,255,0.10)";
+              }}
+              onBlur={(e) => {
+                (e.currentTarget as HTMLInputElement).style.borderColor =
+                  "rgba(255,255,255,0.07)";
+                (e.currentTarget as HTMLInputElement).style.boxShadow = "none";
+              }}
             />
             <button
               onClick={() => onCopySet(setIdx)}
-              className="flex items-center justify-center text-white/15 hover:text-accent transition-all duration-300 ease-out active:scale-90"
-              aria-label="Duplicar serie"
+              className="flex items-center justify-center transition-all duration-300 ease-out active:scale-90"
+              style={{ color: "rgba(255,255,255,0.15)" }}
+              onMouseEnter={(e) =>
+                ((e.currentTarget as HTMLButtonElement).style.color =
+                  "rgb(16,185,129)")
+              }
+              onMouseLeave={(e) =>
+                ((e.currentTarget as HTMLButtonElement).style.color =
+                  "rgba(255,255,255,0.15)")
+              }
+              aria-label="Duplicate set"
             >
               <Copy size={13} />
             </button>
             <button
               onClick={() => onRemoveSet(setIdx)}
               disabled={ex.sets.length === 1}
-              className="flex items-center justify-center text-white/15 hover:text-red-400 transition-all duration-300 ease-out disabled:pointer-events-none disabled:opacity-0 active:scale-90"
-              aria-label="Eliminar serie"
+              className="flex items-center justify-center transition-all duration-300 ease-out disabled:pointer-events-none disabled:opacity-0 active:scale-90"
+              style={{ color: "rgba(255,255,255,0.15)" }}
+              onMouseEnter={(e) =>
+                ((e.currentTarget as HTMLButtonElement).style.color =
+                  "rgb(248,113,113)")
+              }
+              onMouseLeave={(e) =>
+                ((e.currentTarget as HTMLButtonElement).style.color =
+                  "rgba(255,255,255,0.15)")
+              }
+              aria-label="Remove set"
             >
               <Trash2 size={13} />
             </button>
@@ -301,13 +470,30 @@ export function ExerciseCard({
         ))}
       </div>
 
+      {/* Add set */}
       <button
         onClick={onAddSet}
-        className="w-full py-3.5 text-[11px] font-bold uppercase tracking-[0.1em] text-white/25 hover:text-accent hover:bg-accent/[0.04] border-t border-white/[0.05] transition-all duration-300 ease-out rounded-b-3xl"
+        className="w-full py-3.5 text-[11px] font-bold uppercase tracking-[0.1em] transition-all duration-300 ease-out rounded-b-3xl"
+        style={{
+          color: "rgba(255,255,255,0.25)",
+          borderTop: "1px solid rgba(255,255,255,0.05)",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.color =
+            "rgb(16,185,129)";
+          (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+            "rgba(16,185,129,0.04)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.color =
+            "rgba(255,255,255,0.25)";
+          (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+            "transparent";
+        }}
       >
-        + Añadir serie
+        + Add set
       </button>
-    </div>
+    </GlassPanel>
   );
 }
 
@@ -420,10 +606,30 @@ export function ExerciseList({ exercises, actions }: ExerciseListProps) {
 
       <button
         onClick={actions.addExercise}
-        className="mt-3 w-full py-4 rounded-3xl border border-dashed border-white/[0.07] hover:border-primary/25 text-white/25 hover:text-primary/60 hover:bg-primary/[0.03] transition-all duration-300 ease-out flex items-center justify-center gap-2 text-sm font-semibold active:scale-[0.98]"
+        className="mt-3 w-full py-4 rounded-3xl border border-dashed flex items-center justify-center gap-2 text-sm font-semibold transition-all duration-300 ease-out active:scale-[0.98]"
+        style={{
+          borderColor: "rgba(255,255,255,0.07)",
+          color: "rgba(255,255,255,0.25)",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.borderColor =
+            "rgba(37,119,255,0.30)";
+          (e.currentTarget as HTMLButtonElement).style.color =
+            "rgba(37,119,255,0.70)";
+          (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+            "rgba(37,119,255,0.03)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.borderColor =
+            "rgba(255,255,255,0.07)";
+          (e.currentTarget as HTMLButtonElement).style.color =
+            "rgba(255,255,255,0.25)";
+          (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+            "transparent";
+        }}
       >
         <Plus size={15} strokeWidth={2.5} />
-        Añadir ejercicio
+        Add exercise
       </button>
     </>
   );

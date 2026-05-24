@@ -24,9 +24,32 @@ const NAV_ITEMS = [
   { name: "Profile", href: "/profile", icon: User },
 ];
 
-const ACTIVE_INDICATOR: React.CSSProperties = {
+const ACTIVE_DOT: React.CSSProperties = {
   backgroundColor: "rgb(37,119,255)",
-  boxShadow: "0 0 14px rgba(37,119,255,0.6)",
+  boxShadow: "0 0 14px rgba(37,119,255,0.7)",
+};
+
+const ACTIVE_ICON_FILTER = "drop-shadow(0 0 8px rgba(37,119,255,0.75))";
+
+const SIDEBAR_STYLE: React.CSSProperties = {
+  position: "sticky",
+  top: 0,
+  height: "100dvh",
+  overflowY: "auto",
+  background:
+    "linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)",
+  backdropFilter: "blur(30px)",
+  WebkitBackdropFilter: "blur(30px)",
+  borderRight: "1px solid rgba(255,255,255,0.05)",
+  zIndex: 50,
+};
+
+const BOTTOM_NAV_STYLE: React.CSSProperties = {
+  background:
+    "linear-gradient(0deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)",
+  backdropFilter: "blur(30px)",
+  WebkitBackdropFilter: "blur(30px)",
+  borderTop: "1px solid rgba(255,255,255,0.05)",
 };
 
 export default function MainLayout({
@@ -67,21 +90,11 @@ export default function MainLayout({
         </div>
       )}
 
-      {/* Desktop sidebar — sticky in grid column 1 */}
+      {/* Desktop sidebar */}
       {showNav && (
         <aside
           className="hidden md:flex flex-col items-center py-6"
-          style={{
-            position: "sticky",
-            top: 0,
-            height: "100dvh",
-            overflowY: "auto",
-            backgroundColor: "rgba(9,9,14,0.90)",
-            borderRight: "1px solid rgba(255,255,255,0.05)",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)",
-            zIndex: 50,
-          }}
+          style={SIDEBAR_STYLE}
         >
           <div className="w-9 h-9 mb-8 shrink-0">
             <Image
@@ -105,7 +118,7 @@ export default function MainLayout({
                   className="relative w-full h-12 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all duration-300 ease-out"
                   style={{
                     backgroundColor: isActive
-                      ? "rgba(255,255,255,0.07)"
+                      ? "rgba(37,119,255,0.08)"
                       : "transparent",
                     color: isActive
                       ? "rgb(255,255,255)"
@@ -130,13 +143,21 @@ export default function MainLayout({
                     }
                   }}
                 >
+                  {/* Left active indicator */}
                   {isActive && (
                     <span
                       className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full"
-                      style={ACTIVE_INDICATOR}
+                      style={ACTIVE_DOT}
                     />
                   )}
-                  <Icon size={18} strokeWidth={isActive ? 2.5 : 1.75} />
+                  {/* Icon with soft glow when active */}
+                  <span
+                    style={
+                      isActive ? { filter: ACTIVE_ICON_FILTER } : undefined
+                    }
+                  >
+                    <Icon size={18} strokeWidth={isActive ? 2.5 : 1.75} />
+                  </span>
                   <span className="text-[9px] font-semibold tracking-wide opacity-70">
                     {name}
                   </span>
@@ -147,8 +168,8 @@ export default function MainLayout({
         </aside>
       )}
 
-      {/* Main content area — takes full remaining width */}
-      <main className="w-full min-h-screen overflow-y-auto">
+      {/* Main content — full remaining width, no max-w cap */}
+      <main className="w-full max-w-none flex-1 min-h-screen overflow-y-auto">
         <div
           className={showNav ? "w-full px-4 md:px-10 py-6 pb-28 md:pb-10" : ""}
         >
@@ -156,16 +177,11 @@ export default function MainLayout({
         </div>
       </main>
 
-      {/* Mobile bottom nav — strictly md:hidden, fixed */}
+      {/* Mobile bottom nav */}
       {showNav && (
         <nav
           className="md:hidden fixed bottom-0 w-full z-50"
-          style={{
-            backgroundColor: "rgba(9,9,14,0.85)",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)",
-            borderTop: "1px solid rgba(255,255,255,0.05)",
-          }}
+          style={BOTTOM_NAV_STYLE}
         >
           <ul className="flex h-16 items-stretch px-1">
             {NAV_ITEMS.map(({ name, href, icon: Icon }) => {
@@ -184,10 +200,16 @@ export default function MainLayout({
                     {isActive && (
                       <span
                         className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-b-full"
-                        style={ACTIVE_INDICATOR}
+                        style={ACTIVE_DOT}
                       />
                     )}
-                    <Icon size={20} strokeWidth={isActive ? 2.5 : 1.75} />
+                    <span
+                      style={
+                        isActive ? { filter: ACTIVE_ICON_FILTER } : undefined
+                      }
+                    >
+                      <Icon size={20} strokeWidth={isActive ? 2.5 : 1.75} />
+                    </span>
                     <span
                       className="text-[10px] font-semibold tracking-tight"
                       style={{ opacity: isActive ? 1 : 0.5 }}
