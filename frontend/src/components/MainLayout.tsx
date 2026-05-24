@@ -171,7 +171,11 @@ export default function MainLayout({
       {/* Main content — full remaining width, no max-w cap */}
       <main className="w-full max-w-none flex-1 min-h-screen overflow-y-auto">
         <div
-          className={showNav ? "w-full px-4 md:px-10 py-6 pb-28 md:pb-10" : ""}
+          className={
+            showNav
+              ? "w-full max-w-none px-4 md:px-10 py-6 pb-28 md:pb-10"
+              : "w-full max-w-none"
+          }
         >
           {children}
         </div>
