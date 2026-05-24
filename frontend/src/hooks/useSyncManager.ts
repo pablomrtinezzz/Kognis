@@ -121,38 +121,56 @@ async function syncDeleteMutations(token: string): Promise<void> {
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
+const LOCK_NAME = "kognis-sync";
+
+async function runSyncLogic(token: string): Promise<void> {
+  // Crash recovery: records stuck in 'syncing' from a previous session
+  await db.workouts
+    .where("sync_status")
+    .equals("syncing")
+    .modify({ sync_status: "pending" });
+
+  await db.workouts
+    .where("sync_status")
+    .equals("error")
+    .modify({ sync_status: "pending" });
+
+  const pending = await db.workouts
+    .where("sync_status")
+    .equals("pending")
+    .toArray();
+
+  for (const workout of pending) {
+    await syncWorkout(workout, token);
+  }
+
+  await syncDeleteMutations(token);
+}
+
 export function useSyncManager(): void {
   const { session } = useAuth();
   const isSyncing = useRef(false);
 
   const runSync = useCallback(async (token: string) => {
+    // Use Web Locks API to prevent multi-tab race conditions.
+    // ifAvailable: true means "acquire only if no other tab holds the lock".
+    if ("locks" in navigator) {
+      await navigator.locks.request(
+        LOCK_NAME,
+        { ifAvailable: true },
+        async (lock) => {
+          if (!lock) return; // Another tab holds the lock — skip.
+          await runSyncLogic(token);
+        },
+      );
+      return;
+    }
+
+    // Fallback for browsers without Web Locks API.
     if (isSyncing.current) return;
     isSyncing.current = true;
-
     try {
-      // Crash recovery: records stuck in 'syncing' from a previous session
-      await db.workouts
-        .where("sync_status")
-        .equals("syncing")
-        .modify({ sync_status: "pending" });
-
-      // Also retry 'error' records on each new online event
-      await db.workouts
-        .where("sync_status")
-        .equals("error")
-        .modify({ sync_status: "pending" });
-
-      const pending = await db.workouts
-        .where("sync_status")
-        .equals("pending")
-        .toArray();
-
-      for (const workout of pending) {
-        await syncWorkout(workout, token);
-      }
-
-      // Process queued offline deletes
-      await syncDeleteMutations(token);
+      await runSyncLogic(token);
     } finally {
       isSyncing.current = false;
     }

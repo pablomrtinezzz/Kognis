@@ -12,6 +12,11 @@ def _round_weight(kg: float, nearest: float = 1.25) -> float:
     return round(kg / nearest) * nearest
 
 
+def _escape_ilike(value: str) -> str:
+    """Escape backslash, percent, and underscore so user input is treated as a literal string in ilike."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 @router.get("/progression/{exercise_name}", response_model=ProgressionResponse)
 async def get_progression(
     exercise_name: str,
@@ -41,7 +46,7 @@ async def get_progression(
         db.table("workout_exercises")
         .select("id, workout_id")
         .in_("workout_id", workout_ids)
-        .ilike("exercise_name", exercise_name)
+        .ilike("exercise_name", _escape_ilike(exercise_name))
         .execute()
     )
     if not ex_res.data:

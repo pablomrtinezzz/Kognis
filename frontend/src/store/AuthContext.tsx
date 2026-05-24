@@ -19,19 +19,21 @@ import { useRouter, usePathname } from "next/navigation";
 const BYPASS_AUTH = process.env.NEXT_PUBLIC_BYPASS_AUTH === "true";
 
 const DEV_USER = {
-  id: "dev-user-00000000-0000-0000-0000-000000000001",
+  id: "00000000-0000-0000-0000-000000000001",
   aud: "authenticated",
   role: "authenticated",
   email: "dev@kognis.local",
   app_metadata: { provider: "dev-bypass", providers: ["dev-bypass"] },
   user_metadata: { full_name: "Dev User" },
+  // ID must be a valid UUID — matches _DEV_USER_ID in backend/src/api/deps.py
   identities: [],
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 } as unknown as User;
 
 const DEV_SESSION = {
-  access_token: "dev-bypass-token",
+  access_token:
+    process.env.NEXT_PUBLIC_DEV_BYPASS_TOKEN ?? "dev-local-secret-2026",
   refresh_token: "dev-bypass-refresh",
   expires_in: 3600,
   expires_at: Math.floor(Date.now() / 1000) + 3600,
@@ -62,17 +64,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
 
+  // Kept for manual invocation from LoginPage (also auto-called on mount in bypass mode)
   const activateBypass = useCallback(async () => {
     await seedDevDataIfEmpty();
     setUser(DEV_USER);
     setSession(DEV_SESSION);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
-    // Dev bypass: set loading=false so the login page renders, but don't inject
-    // the session yet — that happens when the user clicks the bypass button.
+    // Dev bypass: auto-activate dev session on every mount so page reloads
+    // don't require re-clicking the bypass button.
     if (BYPASS_AUTH) {
-      setLoading(false);
+      activateBypass();
       return;
     }
 
@@ -103,7 +107,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Route protection logic
   useEffect(() => {
@@ -111,7 +115,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const isAuthRoute = pathname === "/login";
 
     if (BYPASS_AUTH) {
-      // Dev bypass: redirect / to the right place, but never kick off other routes
       if (pathname === "/") {
         router.push(user ? "/dashboard" : "/login");
       } else if (user && isAuthRoute) {
@@ -136,9 +139,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         activateBypass: BYPASS_AUTH ? activateBypass : null,
       }}
     >
-      {/* Loading screen to prevent flash of unauthenticated content */}
       {loading ? (
-        <div className="h-screen w-full flex flex-col items-center justify-center bg-background text-primary">
+        <div
+          style={{
+            height: "100vh",
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgb(9, 9, 14)",
+            color: "rgb(37, 119, 255)",
+          }}
+        >
           <div className="animate-pulse text-2xl font-bold">Kognis</div>
         </div>
       ) : (

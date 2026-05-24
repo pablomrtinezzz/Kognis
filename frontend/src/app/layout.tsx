@@ -27,7 +27,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={inter.variable} suppressHydrationWarning>
-      <body>
+      <body
+        className="antialiased"
+        style={{
+          backgroundColor: "rgb(9, 9, 14)",
+          color: "rgb(242, 244, 248)",
+          minHeight: "100dvh",
+        }}
+      >
         <AuthProvider>
           <MainLayout>{children}</MainLayout>
         </AuthProvider>

@@ -55,3 +55,5 @@ frontend/.vercel/
 *.swp
 *.swo
 frontend/tsconfig.tsbuildinfo
+
+docs/assets/sample_video.mov

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Dumbbell, Play, Plus, Trash2 } from "lucide-react";
 import { useWorkoutTemplates } from "@/hooks/useWorkoutTemplates";
 import type { LocalWorkoutTemplate } from "@/lib/db";
+import { GlassPanel } from "@/components/ui/GlassPanel";
 
 // ─── Day chips ─────────────────────────────────────────────────────────────────
 
@@ -38,11 +39,12 @@ function DayChips({
             className={`w-6 h-6 rounded-full text-[10px] font-bold transition-all duration-300 ease-out active:scale-90
               ${
                 active
-                  ? "bg-primary text-white shadow-primary-glow"
+                  ? "bg-primary text-white"
                   : takenBy
                     ? "bg-white/[0.03] text-white/15 cursor-default"
                     : "bg-white/[0.05] text-white/30 hover:bg-white/[0.10] hover:text-white/60"
               }`}
+            style={active ? { boxShadow: "0 0 12px rgba(37,119,255,0.5)" } : undefined}
           >
             {label}
           </button>
@@ -76,7 +78,7 @@ function TemplateCard({
   const remaining = template.exercises.length - 2;
 
   return (
-    <div className="group flex flex-col gap-4 p-4 rounded-3xl bg-card border border-white/[0.06] shadow-card hover:border-white/[0.10] transition-all duration-300 ease-out">
+    <GlassPanel hover glow className="group flex flex-col gap-4 p-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="w-9 h-9 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -142,13 +144,13 @@ function TemplateCard({
         <Play size={11} strokeWidth={0} fill="currentColor" />
         Iniciar
       </button>
-    </div>
+    </GlassPanel>
   );
 }
 
 function TemplateCardSkeleton() {
   return (
-    <div className="flex flex-col gap-4 p-4 rounded-3xl bg-card border border-white/[0.05] animate-pulse">
+    <GlassPanel className="flex flex-col gap-4 p-4 animate-pulse">
       <div className="w-9 h-9 rounded-2xl bg-white/[0.04]" />
       <div className="space-y-2">
         <div className="h-3 bg-white/[0.04] rounded-full w-3/4" />
@@ -160,7 +162,7 @@ function TemplateCardSkeleton() {
         ))}
       </div>
       <div className="h-9 bg-white/[0.03] rounded-full" />
-    </div>
+    </GlassPanel>
   );
 }
 
@@ -210,21 +212,20 @@ export default function WorkoutsPage() {
 
         <Link
           href="/workouts/templates/new"
-          className="flex items-center gap-1.5 bg-primary text-white text-sm font-bold px-5 py-2.5 rounded-full shadow-primary-glow hover:bg-primary/90 active:scale-[0.97] transition-all duration-300 ease-out"
+          className="flex items-center gap-1.5 bg-primary text-white text-sm font-bold px-5 py-2.5 rounded-full hover:bg-primary/90 active:scale-[0.97] transition-all duration-300 ease-out"
+          style={{ boxShadow: "0 8px 32px -4px rgba(37,119,255,0.45)" }}
         >
           <Plus size={14} strokeWidth={2.5} />
           Nueva
         </Link>
       </div>
 
-      {/* Hint */}
       {!loading && templates.length > 0 && (
         <p className="text-[11px] text-white/20">
           Toca los días para planificar tu semana.
         </p>
       )}
 
-      {/* Loading */}
       {loading && (
         <div className="grid grid-cols-2 gap-3">
           {[1, 2, 3, 4].map((i) => (
@@ -233,35 +234,28 @@ export default function WorkoutsPage() {
         </div>
       )}
 
-      {/* Empty state */}
       {!loading && templates.length === 0 && (
-        <div className="py-16 rounded-3xl bg-card border border-white/[0.05] flex flex-col items-center text-center px-6 gap-5">
-          <div className="w-14 h-14 rounded-2xl bg-primary/8 flex items-center justify-center">
-            <Dumbbell
-              size={24}
-              className="text-primary/50"
-              strokeWidth={1.75}
-            />
+        <GlassPanel glow className="py-16 flex flex-col items-center text-center px-6 gap-5">
+          <div className="w-14 h-14 rounded-2xl bg-primary/[0.08] flex items-center justify-center">
+            <Dumbbell size={24} className="text-primary/50" strokeWidth={1.75} />
           </div>
           <div className="space-y-1">
-            <p className="font-bold text-white/50 text-sm">
-              Sin rutinas todavía
-            </p>
+            <p className="font-bold text-white/50 text-sm">Sin rutinas todavía</p>
             <p className="text-white/20 text-xs max-w-[200px]">
               Crea tu primera rutina para empezar a entrenar.
             </p>
           </div>
           <Link
             href="/workouts/templates/new"
-            className="inline-flex items-center gap-2 bg-primary text-white font-bold px-6 py-2.5 rounded-full shadow-primary-glow hover:bg-primary/90 active:scale-[0.97] transition-all duration-300 text-sm"
+            className="inline-flex items-center gap-2 bg-primary text-white font-bold px-6 py-2.5 rounded-full hover:bg-primary/90 active:scale-[0.97] transition-all duration-300 text-sm"
+            style={{ boxShadow: "0 8px 32px -4px rgba(37,119,255,0.45)" }}
           >
             <Plus size={14} strokeWidth={2.5} />
             Crear rutina
           </Link>
-        </div>
+        </GlassPanel>
       )}
 
-      {/* Grid */}
       {!loading && templates.length > 0 && (
         <div className="grid grid-cols-2 gap-3">
           {templates.map((t) => (

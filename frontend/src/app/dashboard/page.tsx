@@ -14,6 +14,7 @@ import { useDashboardData, type Goal } from "@/hooks/useDashboardData";
 import { useWorkoutTemplates } from "@/hooks/useWorkoutTemplates";
 import { useAuth } from "@/store/AuthContext";
 import { MuscularBalanceCard } from "@/components/MuscularBalance";
+import { GlassPanel } from "@/components/ui/GlassPanel";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -58,9 +59,9 @@ function StatCard({
   const bg = accent === "primary" ? "bg-primary/[0.08]" : "bg-accent/[0.08]";
 
   return (
-    <div className="p-5 rounded-3xl bg-card border border-white/[0.06] shadow-card flex flex-col gap-4">
+    <GlassPanel glow className="p-5 flex flex-col gap-4">
       <div
-        className={`w-9 h-9 rounded-2xl ${bg} flex items-center justify-center`}
+        className={`w-9 h-9 rounded-2xl ${bg} border border-white/[0.06] flex items-center justify-center`}
       >
         <Icon size={16} className={color} strokeWidth={2} />
       </div>
@@ -68,7 +69,7 @@ function StatCard({
         <p className={`text-3xl font-bold tracking-tight ${color}`}>{value}</p>
         <p className="text-xs text-white/35 mt-0.5 font-medium">{label}</p>
       </div>
-    </div>
+    </GlassPanel>
   );
 }
 
@@ -110,7 +111,7 @@ function GoalCard({ goal }: { goal: Goal }) {
   const done = pct >= 100;
 
   return (
-    <div className="p-5 rounded-3xl bg-card border border-white/[0.06] shadow-card flex flex-col gap-4">
+    <GlassPanel hover glow className="p-5 flex flex-col gap-4">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <p className="font-bold text-white/90 capitalize text-sm">
@@ -145,14 +146,12 @@ function GoalCard({ goal }: { goal: Goal }) {
           Completado hoy
         </div>
       )}
-    </div>
+    </GlassPanel>
   );
 }
 
 function GoalCardSkeleton() {
-  return (
-    <div className="h-[120px] rounded-3xl bg-card border border-white/[0.05] animate-pulse" />
-  );
+  return <GlassPanel className="h-[120px] animate-pulse" />;
 }
 
 // ─── Weekly grid ──────────────────────────────────────────────────────────────
@@ -316,12 +315,12 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Weekly plan ── */}
-      <div>
+      <GlassPanel glow className="p-4">
         <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/25 mb-3">
           Plan semanal
         </p>
         <WeeklyGrid />
-      </div>
+      </GlassPanel>
 
       {/* ── Today's workout ── */}
       <TodayWorkout />
@@ -362,14 +361,14 @@ export default function DashboardPage() {
         )}
 
         {!loading && goals.length === 0 && (
-          <div className="p-8 rounded-3xl bg-card border border-white/[0.05] text-center space-y-1.5">
+          <GlassPanel glow className="p-8 text-center space-y-1.5">
             <p className="text-white/35 text-sm font-medium">
               No hay objetivos activos.
             </p>
             <p className="text-white/20 text-xs">
               Crea uno para empezar a hacer seguimiento.
             </p>
-          </div>
+          </GlassPanel>
         )}
 
         {!loading && goals.length > 0 && (
