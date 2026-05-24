@@ -1,4 +1,6 @@
-import { CSSProperties, HTMLAttributes, forwardRef } from "react";
+"use client";
+
+import { CSSProperties, HTMLAttributes, forwardRef, useState } from "react";
 
 export interface GlassPanelProps extends HTMLAttributes<HTMLDivElement> {
   variant?: "default" | "primary" | "elevated";
@@ -6,29 +8,36 @@ export interface GlassPanelProps extends HTMLAttributes<HTMLDivElement> {
   hover?: boolean;
 }
 
-const SHADOW: Record<string, string> = {
-  default:
-    "0 0 0 1px rgba(255,255,255,0.05) inset, 0 8px 40px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.04) inset",
+const BASE_SHADOW =
+  "0 25px 50px -12px rgba(0,0,0,1), 0 0 0 1px rgba(255,255,255,0.08) inset";
+
+const GLOW_SHADOW =
+  "0 25px 50px -12px rgba(0,0,0,1), 0 1px 0 rgba(255,255,255,0.2) inset, 0 0 0 1px rgba(255,255,255,0.05) inset";
+
+const HOVER_SHADOW =
+  "0 25px 50px -12px rgba(0,0,0,1), 0 0 0 1px rgba(255,255,255,0.14) inset, 0 1px 0 rgba(255,255,255,0.18) inset";
+
+const VARIANT_SHADOW: Record<string, string> = {
+  default: BASE_SHADOW,
   primary:
-    "0 0 0 1px rgba(37,119,255,0.18) inset, 0 8px 40px rgba(37,119,255,0.10), 0 20px 60px rgba(0,0,0,0.7)",
-  elevated: "0 20px 60px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.04) inset",
-  hover:
-    "0 0 0 1px rgba(255,255,255,0.10) inset, 0 12px 48px rgba(0,0,0,0.75), 0 1px 0 rgba(255,255,255,0.07) inset",
+    "0 25px 50px -12px rgba(0,0,0,1), 0 0 0 1px rgba(37,119,255,0.22) inset, 0 8px 32px rgba(37,119,255,0.08)",
+  elevated:
+    "0 30px 60px -12px rgba(0,0,0,1), 0 0 0 1px rgba(255,255,255,0.10) inset",
 };
 
-const BG: Record<string, string> = {
+const VARIANT_BG: Record<string, string> = {
   default:
-    "linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
+    "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)",
   primary:
-    "linear-gradient(145deg, rgba(37,119,255,0.06) 0%, rgba(37,119,255,0.02) 100%)",
+    "linear-gradient(145deg, rgba(37,119,255,0.07) 0%, rgba(37,119,255,0.02) 100%)",
   elevated:
     "linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
 };
 
-const BORDER_COLOR: Record<string, string> = {
+const VARIANT_BORDER: Record<string, string> = {
   default: "rgba(255,255,255,0.08)",
-  primary: "rgba(37,119,255,0.18)",
-  elevated: "rgba(255,255,255,0.08)",
+  primary: "rgba(37,119,255,0.20)",
+  elevated: "rgba(255,255,255,0.09)",
 };
 
 const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
@@ -40,20 +49,30 @@ const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
       glow = false,
       hover = false,
       children,
+      onMouseEnter,
+      onMouseLeave,
       ...props
     },
     ref,
   ) => {
+    const [isHovered, setIsHovered] = useState(false);
+
+    const resolvedShadow = isHovered
+      ? HOVER_SHADOW
+      : glow
+        ? GLOW_SHADOW
+        : VARIANT_SHADOW[variant];
+
     const panelStyle: CSSProperties = {
       position: "relative",
       borderRadius: "1rem",
       overflow: "hidden",
-      background: BG[variant],
-      boxShadow: SHADOW[variant],
-      border: `1px solid ${BORDER_COLOR[variant]}`,
-      backdropFilter: "blur(20px)",
-      WebkitBackdropFilter: "blur(20px)",
-      transition: "box-shadow 300ms ease, border-color 300ms ease",
+      background: VARIANT_BG[variant],
+      backdropFilter: "blur(24px)",
+      WebkitBackdropFilter: "blur(24px)",
+      boxShadow: resolvedShadow,
+      border: `1px solid ${isHovered ? "rgba(255,255,255,0.12)" : VARIANT_BORDER[variant]}`,
+      transition: "box-shadow 280ms ease, border-color 280ms ease",
       ...(hover ? { cursor: "pointer" } : {}),
       ...externalStyle,
     };
@@ -63,22 +82,14 @@ const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
         ref={ref}
         className={className}
         style={panelStyle}
-        onMouseEnter={
-          hover
-            ? (e) => {
-                e.currentTarget.style.boxShadow = SHADOW.hover;
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
-              }
-            : undefined
-        }
-        onMouseLeave={
-          hover
-            ? (e) => {
-                e.currentTarget.style.boxShadow = SHADOW[variant];
-                e.currentTarget.style.borderColor = BORDER_COLOR[variant];
-              }
-            : undefined
-        }
+        onMouseEnter={(e) => {
+          if (hover) setIsHovered(true);
+          onMouseEnter?.(e);
+        }}
+        onMouseLeave={(e) => {
+          if (hover) setIsHovered(false);
+          onMouseLeave?.(e);
+        }}
         {...props}
       >
         {glow && (
@@ -86,10 +97,12 @@ const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
             aria-hidden="true"
             style={{
               position: "absolute",
-              inset: "0 0 auto 0",
+              top: 0,
+              left: 0,
+              right: 0,
               height: 1,
               background:
-                "linear-gradient(to right, transparent, rgba(255,255,255,0.12), transparent)",
+                "linear-gradient(to right, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%)",
               pointerEvents: "none",
               zIndex: 10,
             }}

@@ -11,7 +11,7 @@ const inter = Inter({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#0B0F17",
+  themeColor: "#09090E",
 };
 
 export const metadata: Metadata = {
@@ -30,11 +30,27 @@ export default function RootLayout({
       <body
         className="antialiased"
         style={{
-          backgroundColor: "rgb(9, 9, 14)",
-          color: "rgb(242, 244, 248)",
+          margin: 0,
+          padding: 0,
           minHeight: "100dvh",
+          color: "rgb(242,244,248)",
         }}
       >
+        {/* Fixed ambient background — rendered at the CSS layer so backdrop-filter has something to blur */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: -1,
+            pointerEvents: "none",
+            background: [
+              "radial-gradient(circle at 15% 50%, rgba(37,119,255,0.08), transparent 25%)",
+              "radial-gradient(circle at 85% 30%, rgba(16,185,129,0.04), transparent 25%)",
+              "#09090E",
+            ].join(", "),
+          }}
+        />
         <AuthProvider>
           <MainLayout>{children}</MainLayout>
         </AuthProvider>
