@@ -165,7 +165,15 @@ export default function EditWorkoutPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="sticky top-0 z-10 bg-background/85 backdrop-blur-2xl border-b border-white/[0.05] -mx-4 md:-mx-8 px-4 md:px-8 py-3 mb-8 flex items-center justify-between">
+      <div
+        className="sticky top-0 z-10 border-b border-white/[0.05] -mx-4 md:-mx-8 px-4 md:px-8 py-3 mb-8 flex items-center justify-between"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(9,9,14,0.90) 0%, rgba(9,9,14,0.72) 100%)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+        }}
+      >
         <button
           onClick={() => router.back()}
           className="flex items-center gap-1.5 text-foreground/40 hover:text-foreground/80 transition-colors text-sm font-medium"

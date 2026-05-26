@@ -35,21 +35,24 @@ const SIDEBAR_STYLE: React.CSSProperties = {
   position: "sticky",
   top: 0,
   height: "100dvh",
+  width: "72px",
   overflowY: "auto",
   background:
     "linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)",
-  backdropFilter: "blur(30px)",
-  WebkitBackdropFilter: "blur(30px)",
+  backdropFilter: "blur(24px)",
+  WebkitBackdropFilter: "blur(24px)",
   borderRight: "1px solid rgba(255,255,255,0.08)",
+  boxShadow: "1px 0 0 rgba(255,255,255,0.04) inset",
   zIndex: 50,
 };
 
 const BOTTOM_NAV_STYLE: React.CSSProperties = {
   background:
     "linear-gradient(0deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)",
-  backdropFilter: "blur(30px)",
-  WebkitBackdropFilter: "blur(30px)",
+  backdropFilter: "blur(24px)",
+  WebkitBackdropFilter: "blur(24px)",
   borderTop: "1px solid rgba(255,255,255,0.08)",
+  boxShadow: "0 -1px 0 rgba(255,255,255,0.04) inset",
 };
 
 export default function MainLayout({
@@ -65,11 +68,8 @@ export default function MainLayout({
 
   return (
     <div
-      className="relative min-h-screen w-full max-w-none md:grid"
-      style={{
-        gridTemplateColumns: showNav ? "80px 1fr" : "1fr",
-        color: "rgb(242,244,248)",
-      }}
+      className={`relative w-full min-h-dvh${showNav ? " md:grid md:grid-cols-[72px_1fr]" : ""}`}
+      style={{ color: "rgb(242,244,248)" }}
     >
       {/* Dev mode badge */}
       {IS_DEV && (
@@ -171,7 +171,7 @@ export default function MainLayout({
       )}
 
       {/* Main content — full remaining width, no max-w cap */}
-      <main className="w-full max-w-none flex-1 min-h-screen overflow-y-auto">
+      <main className="w-full max-w-none min-h-dvh overflow-y-auto">
         <div
           className={
             showNav

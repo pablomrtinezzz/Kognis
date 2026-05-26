@@ -103,7 +103,17 @@ function ExerciseRow({
   };
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-card border border-white/[0.06] shadow-card">
+    <div
+      className="flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-white/[0.06]"
+      style={{
+        background:
+          "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)",
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
+        boxShadow:
+          "0 2px 16px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.04) inset",
+      }}
+    >
       {/* Name input */}
       <div className="flex-1 min-w-0 relative">
         <input
@@ -276,7 +286,15 @@ export default function NewTemplatePage() {
   return (
     <div className="w-full max-w-none flex-1 flex flex-col px-4 md:px-10">
       {/* ── Sticky header ── */}
-      <div className="sticky top-0 z-10 -mx-4 md:-mx-8 px-4 md:px-8 py-3 mb-8 flex items-center justify-between bg-background/80 backdrop-blur-2xl border-b border-white/[0.05]">
+      <div
+        className="sticky top-0 z-10 -mx-4 md:-mx-8 px-4 md:px-8 py-3 mb-8 flex items-center justify-between border-b border-white/[0.05]"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(9,9,14,0.90) 0%, rgba(9,9,14,0.72) 100%)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+        }}
+      >
         <button
           onClick={() => router.back()}
           className="flex items-center gap-1.5 text-white/40 hover:text-white/80 transition-all duration-300 ease-out text-sm font-medium active:scale-[0.96]"
