@@ -33,9 +33,10 @@ function EditTemplateInner() {
       }
       setTemplateName(template.name);
       setExercises(
-        template.exercises.map(({ name, sets, reps }) => ({
+        template.exercises.map(({ name, sets, reps, block }) => ({
           localId: crypto.randomUUID(),
           name,
+          block: block ?? "main",
           sets: Array.from({ length: sets }, () => ({
             localId: crypto.randomUUID(),
             reps: String(reps),
@@ -64,6 +65,7 @@ function EditTemplateInner() {
           name: ex.name.trim(),
           sets: ex.sets.length,
           reps: parseInt(ex.sets[0]?.reps || "0", 10) || 0,
+          block: ex.block,
         })),
       );
       toast("Routine updated", "success");

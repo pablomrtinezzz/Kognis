@@ -62,6 +62,7 @@ export default function EditWorkoutPage() {
           return {
             localId: ex.local_id,
             name: ex.exercise_name,
+            block: ex.block ?? "main",
             sets:
               draftSets.length > 0
                 ? draftSets

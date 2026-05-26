@@ -13,11 +13,13 @@ import {
 import { useAuth } from "@/store/AuthContext";
 import { db } from "@/lib/db";
 import {
+  BLOCK_LABELS,
   DraftExercise,
   ExerciseList,
   newExercise,
   useExerciseActions,
 } from "../_workout-form";
+import type { ExerciseBlock } from "@/lib/db";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { useToast } from "@/components/ui/Toast";
 
@@ -233,6 +235,69 @@ function ExerciseHint({ name }: { name: string }) {
   );
 }
 
+// ─── Active summary grouped by block ─────────────────────────────────────────
+
+const BLOCK_ORDER: ExerciseBlock[] = ["warmup", "main", "cooldown"];
+
+const BLOCK_STYLE: Record<ExerciseBlock, { color: string; dot: string }> = {
+  warmup: { color: "rgba(251,191,36,0.70)", dot: "rgb(245,158,11)" },
+  main: { color: "rgba(37,119,255,0.70)", dot: "rgb(37,119,255)" },
+  cooldown: { color: "rgba(16,185,129,0.70)", dot: "rgb(16,185,129)" },
+};
+
+function ActiveSummary({ exercises }: { exercises: DraftExercise[] }) {
+  const byBlock = BLOCK_ORDER.map((b) => ({
+    block: b,
+    exs: exercises.filter((e) => e.block === b),
+  })).filter((g) => g.exs.length > 0);
+
+  const hasMultipleGroups = byBlock.length > 1;
+
+  return (
+    <ul className="space-y-3.5">
+      {hasMultipleGroups
+        ? byBlock.map(({ block, exs }) => (
+            <li key={block}>
+              <p
+                className="text-[9px] font-bold uppercase tracking-[0.12em] mb-1.5 flex items-center gap-1.5"
+                style={{ color: BLOCK_STYLE[block].color }}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full inline-block"
+                  style={{ backgroundColor: BLOCK_STYLE[block].dot }}
+                />
+                {BLOCK_LABELS[block]}
+              </p>
+              <ul className="space-y-2">
+                {exs.map((ex) => (
+                  <ExerciseSummaryRow key={ex.localId} ex={ex} />
+                ))}
+              </ul>
+            </li>
+          ))
+        : exercises.map((ex) => (
+            <ExerciseSummaryRow key={ex.localId} ex={ex} />
+          ))}
+    </ul>
+  );
+}
+
+function ExerciseSummaryRow({ ex }: { ex: DraftExercise }) {
+  return (
+    <li className="space-y-0.5">
+      <div className="flex justify-between items-center text-sm">
+        <span className="text-white/70 truncate mr-4">
+          {ex.name || "Ejercicio"}
+        </span>
+        <span className="text-white/30 font-mono text-xs shrink-0">
+          {ex.sets.length} sets
+        </span>
+      </div>
+      {ex.name && <ExerciseHint name={ex.name} />}
+    </li>
+  );
+}
+
 // ─── Page inner ───────────────────────────────────────────────────────────────
 
 function NewWorkoutInner() {
@@ -268,9 +333,10 @@ function NewWorkoutInner() {
 
       setWorkoutName(template.name);
       setExercises(
-        template.exercises.map(({ name, sets, reps }) => ({
+        template.exercises.map(({ name, sets, reps, block }) => ({
           localId: crypto.randomUUID(),
           name,
+          block: block ?? "main",
           sets: Array.from({ length: sets }, () => ({
             localId: crypto.randomUUID(),
             reps: String(reps),
@@ -315,6 +381,7 @@ function NewWorkoutInner() {
           workout_local_id: workoutLocalId,
           exercise_name: ex.name.trim(),
           order_index: i,
+          block: ex.block,
           sync_status: "pending",
         });
 
@@ -397,22 +464,7 @@ function NewWorkoutInner() {
               <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/40 mb-4">
                 Resumen Activo
               </h3>
-              <ul className="space-y-3.5">
-                {exercises.map((ex, idx) => (
-                  <li key={ex.localId} className="space-y-0.5">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-white/70 truncate mr-4">
-                        {ex.name || `Ejercicio ${idx + 1}`}
-                      </span>
-                      <span className="text-white/30 font-mono text-xs shrink-0">
-                        {ex.sets.length} sets
-                      </span>
-                    </div>
-                    {/* C2 — previous session hint */}
-                    {ex.name && <ExerciseHint name={ex.name} />}
-                  </li>
-                ))}
-              </ul>
+              <ActiveSummary exercises={exercises} />
             </GlassPanel>
 
             {error && (

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Copy, Plus, Trash2 } from "lucide-react";
 import { EXERCISE_CATALOG, ALL_EXERCISES } from "@/lib/exercises";
 import { GlassPanel } from "@/components/ui/GlassPanel";
+import type { ExerciseBlock } from "@/lib/db";
 
 export { EXERCISE_CATALOG, ALL_EXERCISES };
 
@@ -18,6 +19,7 @@ export interface DraftSet {
 export interface DraftExercise {
   localId: string;
   name: string;
+  block: ExerciseBlock;
   sets: DraftSet[];
 }
 
@@ -30,8 +32,41 @@ export const newSet = (): DraftSet => ({
 export const newExercise = (): DraftExercise => ({
   localId: crypto.randomUUID(),
   name: "",
+  block: "main",
   sets: [newSet()],
 });
+
+// ─── Block chip config ────────────────────────────────────────────────────────
+
+const BLOCK_CONFIG: Record<
+  ExerciseBlock,
+  { label: string; color: string; bg: string; border: string }
+> = {
+  warmup: {
+    label: "Calent.",
+    color: "rgb(251,191,36)",
+    bg: "rgba(245,158,11,0.10)",
+    border: "rgba(245,158,11,0.22)",
+  },
+  main: {
+    label: "Principal",
+    color: "rgb(37,119,255)",
+    bg: "rgba(37,119,255,0.10)",
+    border: "rgba(37,119,255,0.22)",
+  },
+  cooldown: {
+    label: "Vuelta",
+    color: "rgb(16,185,129)",
+    bg: "rgba(16,185,129,0.10)",
+    border: "rgba(16,185,129,0.22)",
+  },
+};
+
+export const BLOCK_LABELS: Record<ExerciseBlock, string> = {
+  warmup: "Calentamiento",
+  main: "Trabajo principal",
+  cooldown: "Vuelta a la calma",
+};
 
 // ─── Exercise Combobox ────────────────────────────────────────────────────────
 
@@ -281,6 +316,7 @@ interface ExerciseCardProps {
   isLast: boolean;
   onRemoveExercise: () => void;
   onUpdateName: (name: string) => void;
+  onUpdateBlock: (block: ExerciseBlock) => void;
   onAddSet: () => void;
   onCopySet: (setIdx: number) => void;
   onRemoveSet: (setIdx: number) => void;
@@ -298,6 +334,7 @@ export function ExerciseCard({
   isLast,
   onRemoveExercise,
   onUpdateName,
+  onUpdateBlock,
   onAddSet,
   onCopySet,
   onRemoveSet,
@@ -343,6 +380,40 @@ export function ExerciseCard({
             <Trash2 size={14} />
           </button>
         )}
+      </div>
+
+      {/* Block selector */}
+      <div
+        className="flex items-center gap-1.5 px-5 py-2.5"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+      >
+        {(["warmup", "main", "cooldown"] as ExerciseBlock[]).map((b) => {
+          const cfg = BLOCK_CONFIG[b];
+          const active = ex.block === b;
+          return (
+            <button
+              key={b}
+              type="button"
+              onClick={() => onUpdateBlock(b)}
+              className="text-[10px] font-bold px-2.5 py-1 rounded-full transition-all duration-200"
+              style={
+                active
+                  ? {
+                      backgroundColor: cfg.bg,
+                      border: `1px solid ${cfg.border}`,
+                      color: cfg.color,
+                    }
+                  : {
+                      backgroundColor: "transparent",
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      color: "rgba(255,255,255,0.20)",
+                    }
+              }
+            >
+              {cfg.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Column headers */}
@@ -512,6 +583,11 @@ export function useExerciseActions(
       prev.map((ex, i) => (i === exIdx ? { ...ex, name } : ex)),
     );
 
+  const updateExerciseBlock = (exIdx: number, block: ExerciseBlock) =>
+    setExercises((prev) =>
+      prev.map((ex, i) => (i === exIdx ? { ...ex, block } : ex)),
+    );
+
   const addSet = (exIdx: number) =>
     setExercises((prev) =>
       prev.map((ex, i) =>
@@ -567,6 +643,7 @@ export function useExerciseActions(
     addExercise,
     removeExercise,
     updateExerciseName,
+    updateExerciseBlock,
     addSet,
     copySet,
     removeSet,
@@ -598,6 +675,7 @@ export function ExerciseList({ exercises, actions }: ExerciseListProps) {
             isLast={exIdx === exercises.length - 1}
             onRemoveExercise={() => actions.removeExercise(exIdx)}
             onUpdateName={(name) => actions.updateExerciseName(exIdx, name)}
+            onUpdateBlock={(block) => actions.updateExerciseBlock(exIdx, block)}
             onAddSet={() => actions.addSet(exIdx)}
             onCopySet={(setIdx) => actions.copySet(exIdx, setIdx)}
             onRemoveSet={(setIdx) => actions.removeSet(exIdx, setIdx)}
@@ -741,6 +819,7 @@ export function templateToExercises(
   return template.exercises.map(({ name, sets, reps }) => ({
     localId: crypto.randomUUID(),
     name,
+    block: "main" as ExerciseBlock,
     sets: Array.from({ length: sets }, () => ({
       localId: crypto.randomUUID(),
       reps: String(reps),

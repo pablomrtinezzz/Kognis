@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle, Minus, Plus } from "lucide-react";
 import { useWorkoutTemplates } from "@/hooks/useWorkoutTemplates";
 import { EXERCISE_CATALOG } from "../../_workout-form";
+import type { ExerciseBlock } from "@/lib/db";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -13,13 +14,39 @@ interface TemplateExerciseDraft {
   name: string;
   sets: number;
   reps: number;
+  block: ExerciseBlock;
 }
+
+const BLOCK_CONFIG: Record<
+  ExerciseBlock,
+  { label: string; color: string; bg: string; border: string }
+> = {
+  warmup: {
+    label: "Calent.",
+    color: "rgb(251,191,36)",
+    bg: "rgba(245,158,11,0.10)",
+    border: "rgba(245,158,11,0.22)",
+  },
+  main: {
+    label: "Principal",
+    color: "rgb(37,119,255)",
+    bg: "rgba(37,119,255,0.10)",
+    border: "rgba(37,119,255,0.22)",
+  },
+  cooldown: {
+    label: "Vuelta",
+    color: "rgb(16,185,129)",
+    bg: "rgba(16,185,129,0.10)",
+    border: "rgba(16,185,129,0.22)",
+  },
+};
 
 const newDraftExercise = (): TemplateExerciseDraft => ({
   id: crypto.randomUUID(),
   name: "",
   sets: 3,
   reps: 10,
+  block: "main",
 });
 
 // ─── Stepper ──────────────────────────────────────────────────────────────────
@@ -67,6 +94,46 @@ function Stepper({
 
 // ─── Exercise row ──────────────────────────────────────────────────────────────
 
+function BlockChips({
+  block,
+  onChange,
+}: {
+  block: ExerciseBlock;
+  onChange: (b: ExerciseBlock) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 pt-2.5 pb-0.5">
+      {(["warmup", "main", "cooldown"] as ExerciseBlock[]).map((b) => {
+        const cfg = BLOCK_CONFIG[b];
+        const active = block === b;
+        return (
+          <button
+            key={b}
+            type="button"
+            onClick={() => onChange(b)}
+            className="text-[10px] font-bold px-2.5 py-1 rounded-full transition-all duration-200"
+            style={
+              active
+                ? {
+                    backgroundColor: cfg.bg,
+                    border: `1px solid ${cfg.border}`,
+                    color: cfg.color,
+                  }
+                : {
+                    backgroundColor: "transparent",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    color: "rgba(255,255,255,0.20)",
+                  }
+            }
+          >
+            {cfg.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ExerciseRow({
   exercise,
   onChange,
@@ -104,7 +171,7 @@ function ExerciseRow({
 
   return (
     <div
-      className="flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-white/[0.06]"
+      className="flex flex-col gap-0 px-4 py-3.5 rounded-2xl border border-white/[0.06]"
       style={{
         background:
           "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)",
@@ -114,123 +181,130 @@ function ExerciseRow({
           "0 2px 16px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.04) inset",
       }}
     >
-      {/* Name input */}
-      <div className="flex-1 min-w-0 relative">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            onChange({ ...exercise, name: e.target.value });
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          onBlur={() =>
-            setTimeout(() => {
-              setOpen(false);
-              setSelectedMuscle(null);
-            }, 150)
-          }
-          placeholder="Nombre del ejercicio"
-          className="w-full bg-transparent text-sm font-semibold text-white/80 placeholder-white/20 focus:outline-none py-0.5"
+      {/* Name + remove row */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0 relative">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              onChange({ ...exercise, name: e.target.value });
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            onBlur={() =>
+              setTimeout(() => {
+                setOpen(false);
+                setSelectedMuscle(null);
+              }, 150)
+            }
+            placeholder="Nombre del ejercicio"
+            className="w-full bg-transparent text-sm font-semibold text-white/80 placeholder-white/20 focus:outline-none py-0.5"
+          />
+
+          {open && (
+            <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl bg-[#111118]/95 backdrop-blur-xl border border-white/[0.07] shadow-float overflow-hidden">
+              {isSearching ? (
+                <div className="max-h-56 overflow-y-auto overscroll-contain">
+                  {Object.keys(searchResults).length > 0 ? (
+                    Object.entries(searchResults).map(([muscle, names]) => (
+                      <div key={muscle}>
+                        <p className="px-4 pt-3.5 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/25">
+                          {muscle}
+                        </p>
+                        {names.map((name) => (
+                          <button
+                            key={name}
+                            type="button"
+                            onMouseDown={() => selectExercise(name)}
+                            className="w-full text-left px-4 py-2.5 text-sm text-white/60 hover:bg-white/[0.05] hover:text-white/90 transition-all duration-200"
+                          >
+                            {name}
+                          </button>
+                        ))}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="px-4 py-4 text-sm text-white/25 italic">
+                      Sin coincidencias — ejercicio personalizado
+                    </p>
+                  )}
+                </div>
+              ) : selectedMuscle ? (
+                <div className="max-h-56 overflow-y-auto overscroll-contain">
+                  <div className="sticky top-0 bg-[#111118]/98 border-b border-white/[0.05] z-10">
+                    <button
+                      type="button"
+                      onMouseDown={() => setSelectedMuscle(null)}
+                      className="flex items-center gap-1.5 px-4 py-3 text-xs font-medium text-white/35 hover:text-white/70 transition-all duration-200"
+                    >
+                      ← {selectedMuscle}
+                    </button>
+                  </div>
+                  {EXERCISE_CATALOG[selectedMuscle].map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onMouseDown={() => selectExercise(name)}
+                      className="w-full text-left px-4 py-2.5 text-sm text-white/60 hover:bg-white/[0.05] hover:text-white/90 transition-all duration-200"
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-2.5">
+                  {muscles.map((muscle) => (
+                    <button
+                      key={muscle}
+                      type="button"
+                      onMouseDown={() => setSelectedMuscle(muscle)}
+                      className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm text-white/55 hover:bg-white/[0.05] hover:text-white/90 transition-all duration-200 font-medium"
+                    >
+                      {muscle}
+                      <span className="text-white/20 text-xs">
+                        {EXERCISE_CATALOG[muscle].length}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Steppers + remove */}
+        <Stepper
+          label="Series"
+          value={exercise.sets}
+          min={1}
+          max={10}
+          onChange={(v) => onChange({ ...exercise, sets: v })}
+        />
+        <Stepper
+          label="Reps"
+          value={exercise.reps}
+          min={1}
+          max={30}
+          onChange={(v) => onChange({ ...exercise, reps: v })}
         />
 
-        {open && (
-          <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl bg-[#111118]/95 backdrop-blur-xl border border-white/[0.07] shadow-float overflow-hidden">
-            {isSearching ? (
-              <div className="max-h-56 overflow-y-auto overscroll-contain">
-                {Object.keys(searchResults).length > 0 ? (
-                  Object.entries(searchResults).map(([muscle, names]) => (
-                    <div key={muscle}>
-                      <p className="px-4 pt-3.5 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/25">
-                        {muscle}
-                      </p>
-                      {names.map((name) => (
-                        <button
-                          key={name}
-                          type="button"
-                          onMouseDown={() => selectExercise(name)}
-                          className="w-full text-left px-4 py-2.5 text-sm text-white/60 hover:bg-white/[0.05] hover:text-white/90 transition-all duration-200"
-                        >
-                          {name}
-                        </button>
-                      ))}
-                    </div>
-                  ))
-                ) : (
-                  <p className="px-4 py-4 text-sm text-white/25 italic">
-                    Sin coincidencias — ejercicio personalizado
-                  </p>
-                )}
-              </div>
-            ) : selectedMuscle ? (
-              <div className="max-h-56 overflow-y-auto overscroll-contain">
-                <div className="sticky top-0 bg-[#111118]/98 border-b border-white/[0.05] z-10">
-                  <button
-                    type="button"
-                    onMouseDown={() => setSelectedMuscle(null)}
-                    className="flex items-center gap-1.5 px-4 py-3 text-xs font-medium text-white/35 hover:text-white/70 transition-all duration-200"
-                  >
-                    ← {selectedMuscle}
-                  </button>
-                </div>
-                {EXERCISE_CATALOG[selectedMuscle].map((name) => (
-                  <button
-                    key={name}
-                    type="button"
-                    onMouseDown={() => selectExercise(name)}
-                    className="w-full text-left px-4 py-2.5 text-sm text-white/60 hover:bg-white/[0.05] hover:text-white/90 transition-all duration-200"
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="p-2.5">
-                {muscles.map((muscle) => (
-                  <button
-                    key={muscle}
-                    type="button"
-                    onMouseDown={() => setSelectedMuscle(muscle)}
-                    className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm text-white/55 hover:bg-white/[0.05] hover:text-white/90 transition-all duration-200 font-medium"
-                  >
-                    {muscle}
-                    <span className="text-white/20 text-xs">
-                      {EXERCISE_CATALOG[muscle].length}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-white/15 hover:text-red-400 transition-all duration-300 ease-out p-1.5 rounded-xl hover:bg-red-400/[0.07] shrink-0 active:scale-90"
+          aria-label="Eliminar"
+        >
+          <Minus size={13} />
+        </button>
       </div>
 
-      {/* Steppers */}
-      <Stepper
-        label="Series"
-        value={exercise.sets}
-        min={1}
-        max={10}
-        onChange={(v) => onChange({ ...exercise, sets: v })}
+      {/* Block chips */}
+      <BlockChips
+        block={exercise.block}
+        onChange={(b) => onChange({ ...exercise, block: b })}
       />
-      <Stepper
-        label="Reps"
-        value={exercise.reps}
-        min={1}
-        max={30}
-        onChange={(v) => onChange({ ...exercise, reps: v })}
-      />
-
-      {/* Remove */}
-      <button
-        type="button"
-        onClick={onRemove}
-        className="text-white/15 hover:text-red-400 transition-all duration-300 ease-out p-1.5 rounded-xl hover:bg-red-400/[0.07] shrink-0 active:scale-90"
-        aria-label="Eliminar"
-      >
-        <Minus size={13} />
-      </button>
     </div>
   );
 }
@@ -274,7 +348,12 @@ export default function NewTemplatePage() {
     try {
       await createTemplate(
         name.trim(),
-        exercises.map(({ name, sets, reps }) => ({ name, sets, reps })),
+        exercises.map(({ name, sets, reps, block }) => ({
+          name,
+          sets,
+          reps,
+          block,
+        })),
       );
       router.push("/workouts");
     } catch {

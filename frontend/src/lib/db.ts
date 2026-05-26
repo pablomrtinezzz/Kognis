@@ -11,10 +11,13 @@ export interface OfflineMutation {
 
 export type SyncStatus = "pending" | "syncing" | "synced" | "error";
 
+export type ExerciseBlock = "warmup" | "main" | "cooldown";
+
 export interface TemplateExercise {
   name: string;
   sets: number;
   reps: number;
+  block?: ExerciseBlock;
 }
 
 export interface LocalWorkoutTemplate {
@@ -54,6 +57,7 @@ export interface LocalWorkoutExercise {
   workout_local_id: string; // FK → workouts.local_id
   exercise_name: string;
   order_index: number;
+  block?: ExerciseBlock;
   sync_status: SyncStatus;
 }
 

@@ -3,86 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  Dumbbell,
-  Pencil,
-  Play,
-  Plus,
-  RefreshCw,
-  Trash2,
-  WifiOff,
-} from "lucide-react";
+import { Dumbbell, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { useWorkoutTemplates } from "@/hooks/useWorkoutTemplates";
-import { useWorkouts } from "@/hooks/useWorkouts";
-import { db } from "@/lib/db";
-import type { LocalWorkout, LocalWorkoutTemplate } from "@/lib/db";
+import type { LocalWorkoutTemplate } from "@/lib/db";
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { useToast } from "@/components/ui/Toast";
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
+// ─── Day chips ────────────────────────────────────────────────────────────────
 
 const DAY_LABELS = ["L", "M", "X", "J", "V", "S", "D"];
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-ES", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
-}
-
-function formatDuration(startIso: string, endIso?: string) {
-  if (!endIso) return null;
-  const mins = Math.round(
-    (new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000,
-  );
-  if (mins < 60) return `${mins} min`;
-  return `${Math.floor(mins / 60)} h ${mins % 60} min`;
-}
-
-// ─── Tab bar ──────────────────────────────────────────────────────────────────
-
-function TabBar({
-  active,
-  onChange,
-}: {
-  active: "rutinas" | "historial";
-  onChange: (t: "rutinas" | "historial") => void;
-}) {
-  return (
-    <div
-      className="flex gap-1 p-1 rounded-2xl"
-      style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
-    >
-      {(["rutinas", "historial"] as const).map((tab) => (
-        <button
-          key={tab}
-          onClick={() => onChange(tab)}
-          className="flex-1 py-2 rounded-xl text-xs font-bold capitalize transition-all duration-200"
-          style={
-            active === tab
-              ? {
-                  backgroundColor: "rgba(37,119,255,0.14)",
-                  color: "rgb(37,119,255)",
-                  border: "1px solid rgba(37,119,255,0.22)",
-                }
-              : {
-                  color: "rgba(255,255,255,0.35)",
-                  border: "1px solid transparent",
-                }
-          }
-        >
-          {tab}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ─── Day chips (Rutinas) ──────────────────────────────────────────────────────
 
 function DayChips({
   templateId,
@@ -130,7 +58,7 @@ function DayChips({
   );
 }
 
-// ─── Template card (Rutinas) ──────────────────────────────────────────────────
+// ─── Template card ────────────────────────────────────────────────────────────
 
 function TemplateCard({
   template,
@@ -177,7 +105,6 @@ function TemplateCard({
           </div>
         ) : (
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-300">
-            {/* A3 — Edit template */}
             <button
               onClick={() =>
                 router.push(`/workouts/templates/edit/${template.id}`)
@@ -250,9 +177,9 @@ function TemplateCardSkeleton() {
   );
 }
 
-// ─── Rutinas tab ──────────────────────────────────────────────────────────────
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
-function RutinasTab() {
+export default function WorkoutsPage() {
   const { templates, loading, deleteTemplate, patchTemplate } =
     useWorkoutTemplates();
 
@@ -277,345 +204,6 @@ function RutinasTab() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="grid grid-cols-2 gap-3">
-        {[1, 2, 3, 4].map((i) => (
-          <TemplateCardSkeleton key={i} />
-        ))}
-      </div>
-    );
-  }
-
-  if (templates.length === 0) {
-    return (
-      <GlassPanel
-        glow
-        className="py-16 flex flex-col items-center text-center px-6 gap-5"
-      >
-        <div className="w-14 h-14 rounded-2xl bg-primary/[0.08] flex items-center justify-center">
-          <Dumbbell size={24} className="text-primary/50" strokeWidth={1.75} />
-        </div>
-        <div className="space-y-1">
-          <p className="font-bold text-white/50 text-sm">Sin rutinas todavía</p>
-          <p className="text-white/20 text-xs max-w-[200px]">
-            Crea tu primera rutina para empezar a entrenar.
-          </p>
-        </div>
-        <Link
-          href="/workouts/templates/new"
-          className="inline-flex items-center gap-2 bg-primary text-white font-bold px-6 py-2.5 rounded-full hover:bg-primary/90 active:scale-[0.97] transition-all duration-300 text-sm"
-          style={{ boxShadow: "0 8px 32px -4px rgba(37,119,255,0.45)" }}
-        >
-          <Plus size={14} strokeWidth={2.5} />
-          Crear rutina
-        </Link>
-      </GlassPanel>
-    );
-  }
-
-  return (
-    <>
-      <p className="text-[11px] text-white/20">
-        Toca los días para planificar tu semana.
-      </p>
-      <div className="grid grid-cols-2 gap-3">
-        {templates.map((t) => (
-          <TemplateCard
-            key={t.id}
-            template={t}
-            allTemplates={templates}
-            onDelete={deleteTemplate}
-            onToggleDay={handleToggleDay}
-          />
-        ))}
-      </div>
-    </>
-  );
-}
-
-// ─── Workout detail (C3) ──────────────────────────────────────────────────────
-
-function WorkoutDetail({ localId }: { localId: string }) {
-  const [exercises, setExercises] = useState<
-    Array<{ name: string; sets: Array<{ reps?: number; weight_kg?: number }> }>
-  >([]);
-  const [loading, setLoading] = useState(true);
-
-  useState(() => {
-    (async () => {
-      const exs = await db.workout_exercises
-        .where("workout_local_id")
-        .equals(localId)
-        .sortBy("order_index");
-
-      const withSets = await Promise.all(
-        exs.map(async (ex) => {
-          const sets = await db.sets
-            .where("workout_exercise_local_id")
-            .equals(ex.local_id)
-            .sortBy("set_number");
-          return { name: ex.exercise_name, sets };
-        }),
-      );
-      setExercises(withSets);
-      setLoading(false);
-    })();
-  });
-
-  if (loading) {
-    return (
-      <div className="pt-2 space-y-1">
-        {[1, 2].map((i) => (
-          <div key={i} className="h-4 rounded bg-white/[0.03] animate-pulse" />
-        ))}
-      </div>
-    );
-  }
-
-  if (exercises.length === 0) return null;
-
-  return (
-    <div className="pt-2 space-y-2 border-t border-white/[0.05]">
-      {exercises.map((ex, i) => (
-        <div key={i} className="flex items-baseline gap-2">
-          <span className="text-[11px] font-semibold text-white/55 min-w-0 truncate flex-1">
-            {ex.name}
-          </span>
-          <span className="text-[10px] text-white/25 shrink-0 tabular-nums">
-            {ex.sets.length} sets
-            {ex.sets[0]?.weight_kg ? ` · ${ex.sets[0].weight_kg} kg` : ""}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Workout history row (Historial) ──────────────────────────────────────────
-
-function WorkoutRow({
-  workout,
-  onDelete,
-  onRetry,
-}: {
-  workout: LocalWorkout;
-  onDelete: (id: string) => void;
-  onRetry: (id: string) => void;
-}) {
-  const [confirming, setConfirming] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const duration = formatDuration(workout.started_at, workout.finished_at);
-
-  return (
-    <GlassPanel className="group flex flex-col gap-0 p-0 overflow-hidden">
-      <div
-        className="flex items-center gap-4 p-4 cursor-pointer"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <div
-          className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0"
-          style={{
-            backgroundColor: "rgba(16,185,129,0.08)",
-            border: "1px solid rgba(16,185,129,0.14)",
-          }}
-        >
-          <Dumbbell
-            size={15}
-            style={{ color: "rgba(16,185,129,0.7)" }}
-            strokeWidth={2}
-          />
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white/85 truncate leading-tight">
-            {workout.name || "Entreno sin nombre"}
-          </p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[11px] text-white/30">
-              {formatDate(workout.started_at)}
-            </span>
-            {duration && (
-              <>
-                <span className="text-white/15 text-[10px]">·</span>
-                <span className="flex items-center gap-0.5 text-[11px] text-white/25">
-                  <Clock size={9} className="shrink-0" />
-                  {duration}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* B2 — Sync status + retry */}
-        {workout.sync_status === "error" && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onRetry(workout.local_id);
-            }}
-            title="Reintentar sincronización"
-            className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all duration-200"
-            style={{
-              color: "rgb(248,113,113)",
-              backgroundColor: "rgba(239,68,68,0.06)",
-              border: "1px solid rgba(239,68,68,0.14)",
-            }}
-          >
-            <RefreshCw size={10} />
-            Retry
-          </button>
-        )}
-        {workout.sync_status === "pending" && (
-          <span
-            className="w-1.5 h-1.5 rounded-full shrink-0"
-            style={{ backgroundColor: "rgba(245,158,11,0.7)" }}
-          />
-        )}
-
-        {/* C3 — Expand chevron */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setExpanded((v) => !v);
-          }}
-          className="text-white/20 hover:text-white/50 transition-colors p-0.5"
-          aria-label="Ver detalles"
-        >
-          {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-        </button>
-
-        {/* Delete */}
-        {confirming ? (
-          <div
-            className="flex items-center gap-1.5 shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => onDelete(workout.local_id)}
-              className="text-[11px] font-bold text-red-400 px-2 py-1 rounded-lg hover:bg-red-400/[0.08] transition-colors"
-            >
-              Borrar
-            </button>
-            <button
-              onClick={() => setConfirming(false)}
-              className="text-[11px] text-white/30 px-2 py-1 rounded-lg hover:bg-white/[0.05] transition-colors"
-            >
-              No
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setConfirming(true);
-            }}
-            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-xl text-white/20 hover:text-red-400 hover:bg-red-400/[0.07] transition-all duration-200 shrink-0"
-            aria-label="Eliminar entreno"
-          >
-            <Trash2 size={13} />
-          </button>
-        )}
-      </div>
-
-      {/* C3 — Drill-down detail */}
-      {expanded && (
-        <div className="px-4 pb-4">
-          <WorkoutDetail localId={workout.local_id} />
-        </div>
-      )}
-    </GlassPanel>
-  );
-}
-
-// ─── Historial tab ────────────────────────────────────────────────────────────
-
-function HistorialTab() {
-  const { workouts, loading, isOffline, deleteWorkout, refresh } =
-    useWorkouts();
-  const toast = useToast();
-
-  const handleRetry = async (localId: string) => {
-    await refresh();
-    toast("Reintentando sincronización…", "info");
-  };
-
-  if (loading) {
-    return (
-      <div className="space-y-2">
-        {[1, 2, 3].map((i) => (
-          <GlassPanel key={i} className="h-[72px] animate-pulse" />
-        ))}
-      </div>
-    );
-  }
-
-  if (workouts.length === 0) {
-    return (
-      <GlassPanel className="py-16 flex flex-col items-center text-center px-6 gap-4">
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center"
-          style={{
-            backgroundColor: "rgba(16,185,129,0.07)",
-            border: "1px solid rgba(16,185,129,0.12)",
-          }}
-        >
-          <Dumbbell
-            size={22}
-            style={{ color: "rgba(16,185,129,0.40)" }}
-            strokeWidth={1.75}
-          />
-        </div>
-        <div className="space-y-1">
-          <p className="font-bold text-white/40 text-sm">Sin sesiones aún</p>
-          <p className="text-white/20 text-xs max-w-[220px]">
-            Inicia una rutina para registrar tu primera sesión.
-          </p>
-        </div>
-        {/* E3 — Cross-module CTA */}
-        <Link
-          href="/workouts"
-          onClick={() => {}}
-          className="text-xs font-semibold text-primary/60 hover:text-primary/90 transition-colors"
-        >
-          Ver rutinas →
-        </Link>
-      </GlassPanel>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {isOffline && (
-        <div
-          className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl font-semibold"
-          style={{
-            color: "rgb(251,191,36)",
-            backgroundColor: "rgba(245,158,11,0.06)",
-            border: "1px solid rgba(245,158,11,0.12)",
-          }}
-        >
-          <WifiOff size={11} />
-          Sin conexión — mostrando datos locales
-        </div>
-      )}
-      {workouts.map((w) => (
-        <WorkoutRow
-          key={w.local_id}
-          workout={w}
-          onDelete={deleteWorkout}
-          onRetry={handleRetry}
-        />
-      ))}
-    </div>
-  );
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
-export default function WorkoutsPage() {
-  const [tab, setTab] = useState<"rutinas" | "historial">("rutinas");
-
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -625,25 +213,71 @@ export default function WorkoutsPage() {
             Workouts
           </h1>
           <p className="text-xs text-white/30 mt-0.5">
-            {tab === "rutinas" ? "Tus rutinas" : "Historial de sesiones"}
+            Tus rutinas de entrenamiento
           </p>
         </div>
+        <Link
+          href="/workouts/templates/new"
+          className="flex items-center gap-1.5 bg-primary text-white text-sm font-bold px-5 py-2.5 rounded-full hover:bg-primary/90 active:scale-[0.97] transition-all duration-300 ease-out"
+          style={{ boxShadow: "0 8px 32px -4px rgba(37,119,255,0.45)" }}
+        >
+          <Plus size={14} strokeWidth={2.5} />
+          Nueva
+        </Link>
+      </div>
 
-        {tab === "rutinas" && (
+      <p className="text-[11px] text-white/20">
+        Toca los días para planificar tu semana.
+      </p>
+
+      {loading ? (
+        <div className="grid grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <TemplateCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : templates.length === 0 ? (
+        <GlassPanel
+          glow
+          className="py-16 flex flex-col items-center text-center px-6 gap-5"
+        >
+          <div className="w-14 h-14 rounded-2xl bg-primary/[0.08] flex items-center justify-center">
+            <Dumbbell
+              size={24}
+              className="text-primary/50"
+              strokeWidth={1.75}
+            />
+          </div>
+          <div className="space-y-1">
+            <p className="font-bold text-white/50 text-sm">
+              Sin rutinas todavía
+            </p>
+            <p className="text-white/20 text-xs max-w-[200px]">
+              Crea tu primera rutina para empezar a entrenar.
+            </p>
+          </div>
           <Link
             href="/workouts/templates/new"
-            className="flex items-center gap-1.5 bg-primary text-white text-sm font-bold px-5 py-2.5 rounded-full hover:bg-primary/90 active:scale-[0.97] transition-all duration-300 ease-out"
+            className="inline-flex items-center gap-2 bg-primary text-white font-bold px-6 py-2.5 rounded-full hover:bg-primary/90 active:scale-[0.97] transition-all duration-300 text-sm"
             style={{ boxShadow: "0 8px 32px -4px rgba(37,119,255,0.45)" }}
           >
             <Plus size={14} strokeWidth={2.5} />
-            Nueva
+            Crear rutina
           </Link>
-        )}
-      </div>
-
-      <TabBar active={tab} onChange={setTab} />
-
-      {tab === "rutinas" ? <RutinasTab /> : <HistorialTab />}
+        </GlassPanel>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {templates.map((t) => (
+            <TemplateCard
+              key={t.id}
+              template={t}
+              allTemplates={templates}
+              onDelete={deleteTemplate}
+              onToggleDay={handleToggleDay}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
