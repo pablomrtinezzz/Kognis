@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FolderOpen, Plus, X } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import type { DocumentItem } from "@/hooks/useDocuments";
+import { db } from "@/lib/db";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -12,9 +13,6 @@ export interface Folder {
   name: string;
   colorIndex: number;
 }
-
-const LS_FOLDERS = "kognis_folders_v1";
-const LS_ASSIGNMENTS = "kognis_folder_assignments_v1"; // { [docId]: folderId }
 
 // ─── Palette — each entry drives the folder-card colour scheme ────────────────
 
@@ -57,60 +55,59 @@ export function useFolders() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [assignments, setAssignments] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    try {
-      const f = localStorage.getItem(LS_FOLDERS);
-      const a = localStorage.getItem(LS_ASSIGNMENTS);
-      if (f) setFolders(JSON.parse(f));
-      if (a) setAssignments(JSON.parse(a));
-    } catch {}
+  const reload = useCallback(async () => {
+    const [allFolders, allAssignments] = await Promise.all([
+      db.folders.orderBy("created_at").toArray(),
+      db.folder_assignments.toArray(),
+    ]);
+    setFolders(allFolders);
+    const map: Record<string, string> = {};
+    for (const a of allAssignments) map[a.doc_id] = a.folder_id;
+    setAssignments(map);
   }, []);
 
-  const persist = useCallback(
-    (nextFolders: Folder[], nextAssignments: Record<string, string>) => {
-      setFolders(nextFolders);
-      setAssignments(nextAssignments);
-      try {
-        localStorage.setItem(LS_FOLDERS, JSON.stringify(nextFolders));
-        localStorage.setItem(LS_ASSIGNMENTS, JSON.stringify(nextAssignments));
-      } catch {}
-    },
-    [],
-  );
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   const createFolder = useCallback(
-    (name: string): Folder => {
+    async (name: string): Promise<Folder> => {
       const next: Folder = {
         id: crypto.randomUUID(),
         name: name.trim(),
         colorIndex: folders.length % PALETTE.length,
       };
-      persist([...folders, next], assignments);
+      await db.folders.put({ ...next, created_at: new Date().toISOString() });
+      setFolders((prev) => [...prev, next]);
       return next;
     },
-    [folders, assignments, persist],
+    [folders.length],
   );
 
   const deleteFolder = useCallback(
-    (id: string) => {
-      const nextFolders = folders.filter((f) => f.id !== id);
-      const nextAssignments = { ...assignments };
-      for (const docId of Object.keys(nextAssignments)) {
-        if (nextAssignments[docId] === id) delete nextAssignments[docId];
-      }
-      persist(nextFolders, nextAssignments);
+    async (id: string) => {
+      await db.folders.delete(id);
+      await db.folder_assignments.where("folder_id").equals(id).delete();
+      await reload();
     },
-    [folders, assignments, persist],
+    [reload],
   );
 
   const assignDocument = useCallback(
-    (docId: string, folderId: string | null) => {
-      const next = { ...assignments };
-      if (folderId === null) delete next[docId];
-      else next[docId] = folderId;
-      persist(folders, next);
+    async (docId: string, folderId: string | null) => {
+      if (folderId === null) {
+        await db.folder_assignments.delete(docId);
+        setAssignments((prev) => {
+          const next = { ...prev };
+          delete next[docId];
+          return next;
+        });
+      } else {
+        await db.folder_assignments.put({ doc_id: docId, folder_id: folderId });
+        setAssignments((prev) => ({ ...prev, [docId]: folderId }));
+      }
     },
-    [folders, assignments, persist],
+    [],
   );
 
   return { folders, assignments, createFolder, deleteFolder, assignDocument };

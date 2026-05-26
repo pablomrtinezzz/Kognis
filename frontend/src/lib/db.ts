@@ -25,6 +25,18 @@ export interface LocalWorkoutTemplate {
   weekdays?: number[]; // 0=Mon … 6=Sun (ISO week)
 }
 
+export interface LocalFolder {
+  id: string;
+  name: string;
+  colorIndex: number;
+  created_at: string;
+}
+
+export interface LocalFolderAssignment {
+  doc_id: string; // PK — document UUID
+  folder_id: string;
+}
+
 export interface LocalWorkout {
   local_id: string; // PK — client-generated UUID
   server_id?: string; // Populated after backend sync
@@ -66,6 +78,8 @@ export class KognisDatabase extends Dexie {
   workout_exercises!: Table<LocalWorkoutExercise, string>;
   sets!: Table<LocalSet, string>;
   workout_templates!: Table<LocalWorkoutTemplate, string>;
+  folders!: Table<LocalFolder, string>;
+  folder_assignments!: Table<LocalFolderAssignment, string>;
 
   constructor() {
     super("KognisDB");
@@ -108,6 +122,18 @@ export class KognisDatabase extends Dexie {
       workout_exercises: "local_id, workout_local_id, sync_status",
       sets: "local_id, workout_exercise_local_id, sync_status",
       workout_templates: "id, name, created_at",
+    });
+
+    // v5 — folders and folder_assignments (Cognitive module organisation)
+    this.version(5).stores({
+      mutations: "++id, type, createdAt",
+      goals: "id, category",
+      workouts: "local_id, server_id, sync_status, user_id, started_at",
+      workout_exercises: "local_id, workout_local_id, sync_status",
+      sets: "local_id, workout_exercise_local_id, sync_status",
+      workout_templates: "id, name, created_at",
+      folders: "id, name, created_at",
+      folder_assignments: "doc_id, folder_id",
     });
   }
 }
