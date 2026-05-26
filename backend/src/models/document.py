@@ -26,3 +26,9 @@ class DocumentListItem(BaseModel):
     created_at: datetime
     flashcard_count: int
     due_count: int
+
+
+class DocumentSummary(BaseModel):
+    document_id: str
+    content: str
+    created_at: datetime

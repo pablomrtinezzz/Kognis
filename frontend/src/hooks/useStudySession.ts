@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/store/AuthContext";
-import { apiGet, apiPost } from "@/lib/apiClient";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/apiClient";
 
 export interface DueCard {
   id: string;
@@ -16,6 +16,7 @@ export interface DueCard {
 export interface SessionStats {
   correct: number;
   incorrect: number;
+  skipped: number;
   total: number;
 }
 
@@ -29,6 +30,7 @@ export function useStudySession(documentId?: string) {
   const [stats, setStats] = useState<SessionStats>({
     correct: 0,
     incorrect: 0,
+    skipped: 0,
     total: 0,
   });
   const [submitting, setSubmitting] = useState(false);
@@ -41,7 +43,7 @@ export function useStudySession(documentId?: string) {
         : "/api/v1/flashcards/due";
       const cards = await apiGet<DueCard[]>(path, token);
       setQueue(cards);
-      setStats({ correct: 0, incorrect: 0, total: cards.length });
+      setStats({ correct: 0, incorrect: 0, skipped: 0, total: cards.length });
     } catch {
       setQueue([]);
     } finally {
@@ -78,6 +80,34 @@ export function useStudySession(documentId?: string) {
     [queue, currentIndex, token, submitting],
   );
 
+  const skipCard = useCallback(() => {
+    setStats((prev) => ({ ...prev, skipped: prev.skipped + 1 }));
+    setCurrentIndex((i) => i + 1);
+  }, []);
+
+  const deleteCard = useCallback(
+    async (cardId: string) => {
+      await apiDelete(`/api/v1/flashcards/${cardId}`, token);
+      setQueue((prev) => prev.filter((c) => c.id !== cardId));
+      setStats((prev) => ({ ...prev, total: Math.max(0, prev.total - 1) }));
+    },
+    [token],
+  );
+
+  const editCard = useCallback(
+    async (cardId: string, front: string, back: string) => {
+      const updated = await apiPatch<DueCard>(
+        `/api/v1/flashcards/${cardId}`,
+        { front, back },
+        token,
+      );
+      setQueue((prev) =>
+        prev.map((c) => (c.id === cardId ? { ...c, ...updated } : c)),
+      );
+    },
+    [token],
+  );
+
   return {
     currentCard: queue[currentIndex] ?? null,
     stats,
@@ -85,5 +115,8 @@ export function useStudySession(documentId?: string) {
     submitting,
     isDone: !loading && currentIndex >= queue.length,
     submitReview,
+    skipCard,
+    deleteCard,
+    editCard,
   };
 }

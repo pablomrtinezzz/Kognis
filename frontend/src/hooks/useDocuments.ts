@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/store/AuthContext";
-import { apiGet, apiPost, apiUpload } from "@/lib/apiClient";
+import { apiDelete, apiGet, apiPost, apiUpload } from "@/lib/apiClient";
 
 export interface DocumentItem {
   id: string;
@@ -103,6 +103,14 @@ export function useDocuments() {
     [token, uploadState.stage, fetchDocuments],
   );
 
+  const deleteDocument = useCallback(
+    async (id: string) => {
+      await apiDelete(`/api/v1/documents/${id}`, token);
+      setDocuments((prev) => prev.filter((d) => d.id !== id));
+    },
+    [token],
+  );
+
   const resetUpload = useCallback(() => {
     setUploadState({ stage: "idle", message: "" });
   }, []);
@@ -115,6 +123,7 @@ export function useDocuments() {
     loading,
     uploadState,
     uploadAndProcess,
+    deleteDocument,
     resetUpload,
     totalDue,
     totalCards,

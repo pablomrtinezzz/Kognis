@@ -48,6 +48,7 @@ type AuthContextType = {
   session: Session | null;
   loading: boolean;
   activateBypass: (() => void) | null;
+  signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -55,6 +56,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   activateBypass: null,
+  signOut: async () => {},
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -63,6 +65,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+
+  const signOut = useCallback(async () => {
+    if (BYPASS_AUTH) {
+      setUser(null);
+      setSession(null);
+      router.push("/login");
+      return;
+    }
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    router.push("/login");
+  }, [router]);
 
   // Kept for manual invocation from LoginPage (also auto-called on mount in bypass mode)
   const activateBypass = useCallback(async () => {
@@ -137,6 +152,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         session,
         loading,
         activateBypass: BYPASS_AUTH ? activateBypass : null,
+        signOut,
       }}
     >
       {loading ? (

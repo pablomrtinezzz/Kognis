@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FolderOpen, Plus, X } from "lucide-react";
+import { FolderOpen, Pencil, Plus, X } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import type { DocumentItem } from "@/hooks/useDocuments";
 import { db } from "@/lib/db";
@@ -93,6 +93,15 @@ export function useFolders() {
     [reload],
   );
 
+  const renameFolder = useCallback(async (id: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    await db.folders.update(id, { name: trimmed });
+    setFolders((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, name: trimmed } : f)),
+    );
+  }, []);
+
   const assignDocument = useCallback(
     async (docId: string, folderId: string | null) => {
       if (folderId === null) {
@@ -110,7 +119,14 @@ export function useFolders() {
     [],
   );
 
-  return { folders, assignments, createFolder, deleteFolder, assignDocument };
+  return {
+    folders,
+    assignments,
+    createFolder,
+    deleteFolder,
+    renameFolder,
+    assignDocument,
+  };
 }
 
 // ─── Inline "create folder" form ─────────────────────────────────────────────
@@ -191,6 +207,7 @@ interface FolderGridProps {
   onSelectFolder: (folder: Folder) => void;
   onCreateFolder: (name: string) => void;
   onDeleteFolder: (id: string) => void;
+  onRenameFolder: (id: string, newName: string) => void;
 }
 
 export function FolderGrid({
@@ -200,8 +217,11 @@ export function FolderGrid({
   onSelectFolder,
   onCreateFolder,
   onDeleteFolder,
+  onRenameFolder,
 }: FolderGridProps) {
   const [creating, setCreating] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   const handleCreate = (name: string) => {
     onCreateFolder(name);
@@ -307,17 +327,39 @@ export function FolderGrid({
                 </div>
 
                 {/* Name + count */}
-                <div className="flex-1">
-                  <p className="font-bold text-white/90 text-sm truncate leading-tight">
-                    {folder.name}
-                  </p>
+                <div className="flex-1 min-w-0">
+                  {renamingId === folder.id ? (
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          onRenameFolder(folder.id, renameValue);
+                          setRenamingId(null);
+                        }
+                        if (e.key === "Escape") setRenamingId(null);
+                      }}
+                      onBlur={() => {
+                        if (renameValue.trim())
+                          onRenameFolder(folder.id, renameValue);
+                        setRenamingId(null);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full bg-transparent text-sm font-bold text-white/90 outline-none border-b border-white/20 pb-0.5"
+                    />
+                  ) : (
+                    <p className="font-bold text-white/90 text-sm truncate leading-tight">
+                      {folder.name}
+                    </p>
+                  )}
                   <p className="text-[11px] text-white/30 mt-0.5">
                     {folderDocs.length}{" "}
                     {folderDocs.length === 1 ? "deck" : "decks"}
                   </p>
                 </div>
 
-                {/* Due badge */}
+                {/* Due badge + actions */}
                 <div className="flex items-center justify-between">
                   {due > 0 ? (
                     <span
@@ -333,16 +375,29 @@ export function FolderGrid({
                   ) : (
                     <span />
                   )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteFolder(folder.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-red-400 transition-all duration-200 p-1 rounded-lg hover:bg-red-400/[0.08]"
-                    aria-label="Delete folder"
-                  >
-                    <X size={11} />
-                  </button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRenamingId(folder.id);
+                        setRenameValue(folder.name);
+                      }}
+                      className="text-white/20 hover:text-white/60 p-1 rounded-lg hover:bg-white/[0.06] transition-all duration-200"
+                      aria-label="Rename folder"
+                    >
+                      <Pencil size={11} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteFolder(folder.id);
+                      }}
+                      className="text-white/20 hover:text-red-400 p-1 rounded-lg hover:bg-red-400/[0.08] transition-all duration-200"
+                      aria-label="Delete folder"
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
                 </div>
               </GlassPanel>
             );

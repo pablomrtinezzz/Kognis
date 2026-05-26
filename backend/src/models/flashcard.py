@@ -12,6 +12,11 @@ class FlashcardDue(BaseModel):
     next_review_at: datetime
 
 
+class FlashcardUpdate(BaseModel):
+    front: str | None = None
+    back: str | None = None
+
+
 class ReviewRequest(BaseModel):
     correct: bool
 

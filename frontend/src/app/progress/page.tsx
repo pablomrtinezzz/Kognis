@@ -248,7 +248,21 @@ export default function ProgressPage() {
         </p>
       </div>
 
-      {!templatesLoading && (
+      {!templatesLoading && templates.length === 0 && (
+        <GlassPanel className="py-10 flex flex-col items-center gap-3 text-center">
+          <p className="text-sm text-white/40">
+            Aún no tienes rutinas creadas.
+          </p>
+          <a
+            href="/workouts/templates/new"
+            className="text-xs font-bold text-primary/70 hover:text-primary transition-colors"
+          >
+            Crear primera rutina →
+          </a>
+        </GlassPanel>
+      )}
+
+      {!templatesLoading && templates.length > 0 && (
         <Dropdown
           value={selectedTemplateId}
           placeholder="Selecciona una rutina"

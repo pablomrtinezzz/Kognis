@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.api.deps import get_current_user
 from src.core.database import db
-from src.models.flashcard import FlashcardDue, ReviewRequest, ReviewResponse
+from src.models.flashcard import (
+    FlashcardDue,
+    FlashcardUpdate,
+    ReviewRequest,
+    ReviewResponse,
+)
 
 router = APIRouter(prefix="/flashcards", tags=["Cognitive Module"])
 
@@ -96,3 +101,76 @@ async def review_flashcard(
         box=updated["box"],
         next_review_at=updated["next_review_at"],
     )
+
+
+@router.patch("/{flashcard_id}", response_model=dict)
+async def update_flashcard(
+    flashcard_id: str,
+    body: FlashcardUpdate,
+    user_id: str = Depends(get_current_user),
+):
+    """Edit the front and/or back text of a flashcard."""
+    try:
+        existing = (
+            db.table("flashcards")
+            .select("id, user_id")
+            .eq("id", flashcard_id)
+            .single()
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Flashcard not found."
+        ) from e
+
+    if existing.data["user_id"] != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden.")
+
+    patch: dict = {}
+    if body.front is not None:
+        patch["front"] = body.front
+    if body.back is not None:
+        patch["back"] = body.back
+
+    if not patch:
+        return existing.data
+
+    try:
+        res = db.table("flashcards").update(patch).eq("id", flashcard_id).execute()
+        return res.data[0]
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update flashcard: {str(e)}",
+        ) from e
+
+
+@router.delete("/{flashcard_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_flashcard(
+    flashcard_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Permanently delete a flashcard."""
+    try:
+        existing = (
+            db.table("flashcards")
+            .select("id, user_id")
+            .eq("id", flashcard_id)
+            .single()
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Flashcard not found."
+        ) from e
+
+    if existing.data["user_id"] != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden.")
+
+    try:
+        db.table("flashcards").delete().eq("id", flashcard_id).execute()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete flashcard: {str(e)}",
+        ) from e

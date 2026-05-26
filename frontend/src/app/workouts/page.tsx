@@ -3,11 +3,24 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Clock, Dumbbell, Play, Plus, Trash2, WifiOff } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Dumbbell,
+  Pencil,
+  Play,
+  Plus,
+  RefreshCw,
+  Trash2,
+  WifiOff,
+} from "lucide-react";
 import { useWorkoutTemplates } from "@/hooks/useWorkoutTemplates";
 import { useWorkouts } from "@/hooks/useWorkouts";
+import { db } from "@/lib/db";
 import type { LocalWorkout, LocalWorkoutTemplate } from "@/lib/db";
 import { GlassPanel } from "@/components/ui/GlassPanel";
+import { useToast } from "@/components/ui/Toast";
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -69,7 +82,7 @@ function TabBar({
   );
 }
 
-// ─── Day chips (Rutinas) ───────────────────────────────────────────────────────
+// ─── Day chips (Rutinas) ──────────────────────────────────────────────────────
 
 function DayChips({
   templateId,
@@ -163,13 +176,25 @@ function TemplateCard({
             </button>
           </div>
         ) : (
-          <button
-            onClick={() => setConfirming(true)}
-            className="opacity-0 group-hover:opacity-100 text-white/15 hover:text-red-400 transition-all duration-300 p-1.5 rounded-xl hover:bg-red-400/[0.07] active:scale-90"
-            aria-label="Eliminar"
-          >
-            <Trash2 size={13} />
-          </button>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-300">
+            {/* A3 — Edit template */}
+            <button
+              onClick={() =>
+                router.push(`/workouts/templates/edit/${template.id}`)
+              }
+              className="p-1.5 rounded-xl text-white/20 hover:text-white/70 hover:bg-white/[0.06] transition-all duration-300"
+              aria-label="Editar rutina"
+            >
+              <Pencil size={12} />
+            </button>
+            <button
+              onClick={() => setConfirming(true)}
+              className="p-1.5 rounded-xl text-white/15 hover:text-red-400 hover:bg-red-400/[0.07] active:scale-90 transition-all duration-300"
+              aria-label="Eliminar"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
         )}
       </div>
 
@@ -309,89 +334,195 @@ function RutinasTab() {
   );
 }
 
+// ─── Workout detail (C3) ──────────────────────────────────────────────────────
+
+function WorkoutDetail({ localId }: { localId: string }) {
+  const [exercises, setExercises] = useState<
+    Array<{ name: string; sets: Array<{ reps?: number; weight_kg?: number }> }>
+  >([]);
+  const [loading, setLoading] = useState(true);
+
+  useState(() => {
+    (async () => {
+      const exs = await db.workout_exercises
+        .where("workout_local_id")
+        .equals(localId)
+        .sortBy("order_index");
+
+      const withSets = await Promise.all(
+        exs.map(async (ex) => {
+          const sets = await db.sets
+            .where("workout_exercise_local_id")
+            .equals(ex.local_id)
+            .sortBy("set_number");
+          return { name: ex.exercise_name, sets };
+        }),
+      );
+      setExercises(withSets);
+      setLoading(false);
+    })();
+  });
+
+  if (loading) {
+    return (
+      <div className="pt-2 space-y-1">
+        {[1, 2].map((i) => (
+          <div key={i} className="h-4 rounded bg-white/[0.03] animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (exercises.length === 0) return null;
+
+  return (
+    <div className="pt-2 space-y-2 border-t border-white/[0.05]">
+      {exercises.map((ex, i) => (
+        <div key={i} className="flex items-baseline gap-2">
+          <span className="text-[11px] font-semibold text-white/55 min-w-0 truncate flex-1">
+            {ex.name}
+          </span>
+          <span className="text-[10px] text-white/25 shrink-0 tabular-nums">
+            {ex.sets.length} sets
+            {ex.sets[0]?.weight_kg ? ` · ${ex.sets[0].weight_kg} kg` : ""}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Workout history row (Historial) ──────────────────────────────────────────
 
 function WorkoutRow({
   workout,
   onDelete,
+  onRetry,
 }: {
   workout: LocalWorkout;
   onDelete: (id: string) => void;
+  onRetry: (id: string) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const duration = formatDuration(workout.started_at, workout.finished_at);
 
   return (
-    <GlassPanel className="group flex items-center gap-4 p-4">
+    <GlassPanel className="group flex flex-col gap-0 p-0 overflow-hidden">
       <div
-        className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0"
-        style={{
-          backgroundColor: "rgba(16,185,129,0.08)",
-          border: "1px solid rgba(16,185,129,0.14)",
-        }}
+        className="flex items-center gap-4 p-4 cursor-pointer"
+        onClick={() => setExpanded((v) => !v)}
       >
-        <Dumbbell
-          size={15}
-          style={{ color: "rgba(16,185,129,0.7)" }}
-          strokeWidth={2}
-        />
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-white/85 truncate leading-tight">
-          {workout.name || "Entreno sin nombre"}
-        </p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[11px] text-white/30">
-            {formatDate(workout.started_at)}
-          </span>
-          {duration && (
-            <>
-              <span className="text-white/15 text-[10px]">·</span>
-              <span className="flex items-center gap-0.5 text-[11px] text-white/25">
-                <Clock size={9} className="shrink-0" />
-                {duration}
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Sync indicator */}
-      {workout.sync_status === "error" && (
-        <WifiOff size={12} style={{ color: "rgba(239,68,68,0.6)" }} />
-      )}
-      {workout.sync_status === "pending" && (
-        <span
-          className="w-1.5 h-1.5 rounded-full"
-          style={{ backgroundColor: "rgba(245,158,11,0.7)" }}
-        />
-      )}
-
-      {/* Delete */}
-      {confirming ? (
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={() => onDelete(workout.local_id)}
-            className="text-[11px] font-bold text-red-400 px-2 py-1 rounded-lg hover:bg-red-400/[0.08] transition-colors"
-          >
-            Borrar
-          </button>
-          <button
-            onClick={() => setConfirming(false)}
-            className="text-[11px] text-white/30 px-2 py-1 rounded-lg hover:bg-white/[0.05] transition-colors"
-          >
-            No
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={() => setConfirming(true)}
-          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-xl text-white/20 hover:text-red-400 hover:bg-red-400/[0.07] transition-all duration-200 shrink-0"
-          aria-label="Eliminar entreno"
+        <div
+          className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0"
+          style={{
+            backgroundColor: "rgba(16,185,129,0.08)",
+            border: "1px solid rgba(16,185,129,0.14)",
+          }}
         >
-          <Trash2 size={13} />
+          <Dumbbell
+            size={15}
+            style={{ color: "rgba(16,185,129,0.7)" }}
+            strokeWidth={2}
+          />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-white/85 truncate leading-tight">
+            {workout.name || "Entreno sin nombre"}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-[11px] text-white/30">
+              {formatDate(workout.started_at)}
+            </span>
+            {duration && (
+              <>
+                <span className="text-white/15 text-[10px]">·</span>
+                <span className="flex items-center gap-0.5 text-[11px] text-white/25">
+                  <Clock size={9} className="shrink-0" />
+                  {duration}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* B2 — Sync status + retry */}
+        {workout.sync_status === "error" && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRetry(workout.local_id);
+            }}
+            title="Reintentar sincronización"
+            className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all duration-200"
+            style={{
+              color: "rgb(248,113,113)",
+              backgroundColor: "rgba(239,68,68,0.06)",
+              border: "1px solid rgba(239,68,68,0.14)",
+            }}
+          >
+            <RefreshCw size={10} />
+            Retry
+          </button>
+        )}
+        {workout.sync_status === "pending" && (
+          <span
+            className="w-1.5 h-1.5 rounded-full shrink-0"
+            style={{ backgroundColor: "rgba(245,158,11,0.7)" }}
+          />
+        )}
+
+        {/* C3 — Expand chevron */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded((v) => !v);
+          }}
+          className="text-white/20 hover:text-white/50 transition-colors p-0.5"
+          aria-label="Ver detalles"
+        >
+          {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         </button>
+
+        {/* Delete */}
+        {confirming ? (
+          <div
+            className="flex items-center gap-1.5 shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => onDelete(workout.local_id)}
+              className="text-[11px] font-bold text-red-400 px-2 py-1 rounded-lg hover:bg-red-400/[0.08] transition-colors"
+            >
+              Borrar
+            </button>
+            <button
+              onClick={() => setConfirming(false)}
+              className="text-[11px] text-white/30 px-2 py-1 rounded-lg hover:bg-white/[0.05] transition-colors"
+            >
+              No
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setConfirming(true);
+            }}
+            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-xl text-white/20 hover:text-red-400 hover:bg-red-400/[0.07] transition-all duration-200 shrink-0"
+            aria-label="Eliminar entreno"
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
+      </div>
+
+      {/* C3 — Drill-down detail */}
+      {expanded && (
+        <div className="px-4 pb-4">
+          <WorkoutDetail localId={workout.local_id} />
+        </div>
       )}
     </GlassPanel>
   );
@@ -400,7 +531,14 @@ function WorkoutRow({
 // ─── Historial tab ────────────────────────────────────────────────────────────
 
 function HistorialTab() {
-  const { workouts, loading, isOffline, deleteWorkout } = useWorkouts();
+  const { workouts, loading, isOffline, deleteWorkout, refresh } =
+    useWorkouts();
+  const toast = useToast();
+
+  const handleRetry = async (localId: string) => {
+    await refresh();
+    toast("Reintentando sincronización…", "info");
+  };
 
   if (loading) {
     return (
@@ -434,6 +572,14 @@ function HistorialTab() {
             Inicia una rutina para registrar tu primera sesión.
           </p>
         </div>
+        {/* E3 — Cross-module CTA */}
+        <Link
+          href="/workouts"
+          onClick={() => {}}
+          className="text-xs font-semibold text-primary/60 hover:text-primary/90 transition-colors"
+        >
+          Ver rutinas →
+        </Link>
       </GlassPanel>
     );
   }
@@ -454,7 +600,12 @@ function HistorialTab() {
         </div>
       )}
       {workouts.map((w) => (
-        <WorkoutRow key={w.local_id} workout={w} onDelete={deleteWorkout} />
+        <WorkoutRow
+          key={w.local_id}
+          workout={w}
+          onDelete={deleteWorkout}
+          onRetry={handleRetry}
+        />
       ))}
     </div>
   );

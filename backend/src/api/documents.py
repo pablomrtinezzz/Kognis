@@ -9,6 +9,7 @@ from src.api.deps import get_current_user
 from src.core.database import db
 from src.models.document import (
     DocumentListItem,
+    DocumentSummary,
     DocumentUploadResponse,
     ProcessResponse,
 )
@@ -287,3 +288,103 @@ async def process_document(
         flashcards_generated=len(combined_flashcards),
         summary_preview=combined_summary[:500],
     )
+
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+
+
+@router.get("/{document_id}/summary", response_model=DocumentSummary)
+async def get_document_summary(
+    document_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Return the AI-generated summary for a document."""
+    try:
+        doc_res = (
+            db.table("documents")
+            .select("id, user_id")
+            .eq("id", document_id)
+            .single()
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found."
+        ) from e
+
+    if doc_res.data["user_id"] != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden.")
+
+    try:
+        res = (
+            db.table("document_summaries")
+            .select("document_id, content, created_at")
+            .eq("document_id", document_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        ) from e
+
+    if not res.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No summary found for this document.",
+        )
+
+    return res.data[0]
+
+
+# ── Delete ────────────────────────────────────────────────────────────────────
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_document(
+    document_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Cascade-delete a document, its flashcards, summaries, and storage."""
+    try:
+        doc_res = (
+            db.table("documents")
+            .select("id, user_id, storage_path")
+            .eq("id", document_id)
+            .single()
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found."
+        ) from e
+
+    doc = doc_res.data
+    if doc["user_id"] != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden.")
+
+    # Cascade: delete flashcards and summaries first
+    try:
+        db.table("flashcards").delete().eq("document_id", document_id).execute()
+        db.table("document_summaries").delete().eq("document_id", document_id).execute()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete associated data: {str(e)}",
+        ) from e
+
+    # Remove from storage (non-fatal if already gone)
+    if doc.get("storage_path"):
+        try:
+            db.storage.from_("documents").remove([doc["storage_path"]])
+        except Exception:
+            pass
+
+    try:
+        db.table("documents").delete().eq("id", document_id).execute()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete document: {str(e)}",
+        ) from e

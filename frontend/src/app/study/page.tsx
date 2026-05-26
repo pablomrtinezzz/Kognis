@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Brain,
   CheckCircle2,
@@ -9,16 +9,23 @@ import {
   FolderOpen,
   Layers,
   Loader2,
+  Pencil,
   RotateCcw,
+  SkipForward,
   Sparkles,
+  Trash2,
   UploadCloud,
+  X,
   XCircle,
   Zap,
 } from "lucide-react";
 import { useDocuments, type DocumentItem } from "@/hooks/useDocuments";
 import { useStudySession } from "@/hooks/useStudySession";
 import { GlassPanel } from "@/components/ui/GlassPanel";
+import { useToast } from "@/components/ui/Toast";
 import { FolderGrid, useFolders, type Folder } from "@/components/FolderGrid";
+import { apiGet } from "@/lib/apiClient";
+import { useAuth } from "@/store/AuthContext";
 
 // ─── 3D Flashcard ─────────────────────────────────────────────────────────────
 
@@ -93,7 +100,7 @@ function FlashCard3D({
             {front}
           </p>
           <p className="text-[11px] text-white/20 font-medium tracking-widest uppercase">
-            tap to reveal
+            tap to reveal · space
           </p>
         </div>
 
@@ -139,6 +146,109 @@ function FlashCard3D({
   );
 }
 
+// ─── Edit flashcard modal ─────────────────────────────────────────────────────
+
+function EditCardModal({
+  front,
+  back,
+  onSave,
+  onClose,
+}: {
+  front: string;
+  back: string;
+  onSave: (front: string, back: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [f, setF] = useState(front);
+  const [b, setB] = useState(back);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!f.trim() || !b.trim()) return;
+    setSaving(true);
+    await onSave(f.trim(), b.trim());
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[500] flex items-center justify-center p-4"
+      style={{
+        backgroundColor: "rgba(0,0,0,0.65)",
+        backdropFilter: "blur(8px)",
+      }}
+      onClick={onClose}
+    >
+      <GlassPanel
+        glow
+        className="w-full max-w-md p-6 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-bold text-white/70">Edit flashcard</p>
+          <button
+            onClick={onClose}
+            className="text-white/30 hover:text-white/60"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/25 mb-1.5">
+              Question
+            </p>
+            <textarea
+              value={f}
+              onChange={(e) => setF(e.target.value)}
+              rows={3}
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white/85 focus:outline-none focus:border-blue-500/40 resize-none"
+            />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/25 mb-1.5">
+              Answer
+            </p>
+            <textarea
+              value={b}
+              onChange={(e) => setB(e.target.value)}
+              rows={3}
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white/85 focus:outline-none focus:border-blue-500/40 resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white/40 hover:text-white/70 transition-colors"
+            style={{
+              backgroundColor: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.07)",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !f.trim() || !b.trim()}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-40"
+            style={{
+              backgroundColor: "rgba(37,119,255,0.14)",
+              border: "1px solid rgba(37,119,255,0.25)",
+              color: "rgb(37,119,255)",
+            }}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </GlassPanel>
+    </div>
+  );
+}
+
 // ─── Leitner progress dots ────────────────────────────────────────────────────
 
 function BoxDots({ box }: { box: number }) {
@@ -177,17 +287,73 @@ function StudyView({
   documentId?: string;
   onExit: () => void;
 }) {
-  const { currentCard, stats, loading, submitting, isDone, submitReview } =
-    useStudySession(documentId);
+  const {
+    currentCard,
+    stats,
+    loading,
+    submitting,
+    isDone,
+    submitReview,
+    skipCard,
+    deleteCard,
+    editCard,
+  } = useStudySession(documentId);
+
   const [flipped, setFlipped] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const toast = useToast();
+
+  // D3 — Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (editOpen) return;
+      if (e.code === "Space") {
+        e.preventDefault();
+        setFlipped((f) => !f);
+      }
+      if (e.code === "ArrowRight" && flipped && !submitting) {
+        handleAnswer(true);
+      }
+      if (e.code === "ArrowLeft" && flipped && !submitting) {
+        handleAnswer(false);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flipped, submitting, editOpen]);
 
   const handleAnswer = useCallback(
     (correct: boolean) => {
       setFlipped(false);
+      setDeleteConfirm(false);
       setTimeout(() => submitReview(correct), 200);
     },
     [submitReview],
   );
+
+  const handleDelete = async () => {
+    if (!currentCard) return;
+    try {
+      await deleteCard(currentCard.id);
+      setDeleteConfirm(false);
+      setFlipped(false);
+      toast("Flashcard deleted", "success");
+    } catch {
+      toast("Could not delete card. Try again.", "error");
+    }
+  };
+
+  const handleEdit = async (front: string, back: string) => {
+    if (!currentCard) return;
+    try {
+      await editCard(currentCard.id, front, back);
+      toast("Card updated", "success");
+    } catch {
+      toast("Could not save changes.", "error");
+    }
+  };
 
   if (loading) {
     return (
@@ -250,7 +416,7 @@ function StudyView({
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 w-full max-w-[300px]">
+        <div className="grid grid-cols-4 gap-3 w-full max-w-[340px]">
           {[
             {
               label: "Correct",
@@ -261,6 +427,11 @@ function StudyView({
               label: "Missed",
               value: stats.incorrect,
               color: "rgb(248,113,113)",
+            },
+            {
+              label: "Skipped",
+              value: stats.skipped,
+              color: "rgba(255,255,255,0.40)",
             },
             { label: "Score", value: `${pct}%`, color: "rgb(37,119,255)" },
           ].map(({ label, value, color }) => (
@@ -310,79 +481,155 @@ function StudyView({
 
   if (!currentCard) return null;
 
-  const reviewed = stats.correct + stats.incorrect;
+  const reviewed = stats.correct + stats.incorrect + stats.skipped;
   const progress = stats.total > 0 ? (reviewed / stats.total) * 100 : 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={onExit}
-          className="flex items-center gap-1.5 text-white/35 hover:text-white/65 transition-colors text-sm font-medium"
-        >
-          <ChevronLeft size={15} />
-          Back
-        </button>
-        <span className="text-xs text-white/30 font-semibold tabular-nums">
-          {reviewed + 1} / {stats.total}
-        </span>
-      </div>
+    <>
+      {editOpen && (
+        <EditCardModal
+          front={currentCard.front}
+          back={currentCard.back}
+          onSave={handleEdit}
+          onClose={() => setEditOpen(false)}
+        />
+      )}
 
-      <div className="h-[3px] rounded-full bg-white/[0.06] overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-500 ease-out"
-          style={{
-            width: `${progress}%`,
-            backgroundColor: "rgb(37,119,255)",
-            boxShadow: "0 0 8px rgba(37,119,255,0.5)",
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={onExit}
+            className="flex items-center gap-1.5 text-white/35 hover:text-white/65 transition-colors text-sm font-medium"
+          >
+            <ChevronLeft size={15} />
+            Back
+          </button>
+          <div className="flex items-center gap-2">
+            {/* D2 — Skip */}
+            <button
+              onClick={() => {
+                skipCard();
+                setFlipped(false);
+                setDeleteConfirm(false);
+              }}
+              className="flex items-center gap-1 text-[11px] font-semibold text-white/25 hover:text-white/55 transition-colors px-2 py-1 rounded-lg hover:bg-white/[0.04]"
+              title="Skip card (doesn't count)"
+            >
+              <SkipForward size={12} />
+              Skip
+            </button>
+            <span className="text-xs text-white/30 font-semibold tabular-nums">
+              {reviewed + 1} / {stats.total}
+            </span>
+          </div>
+        </div>
+
+        <div className="h-[3px] rounded-full bg-white/[0.06] overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500 ease-out"
+            style={{
+              width: `${progress}%`,
+              backgroundColor: "rgb(37,119,255)",
+              boxShadow: "0 0 8px rgba(37,119,255,0.5)",
+            }}
+          />
+        </div>
+
+        <BoxDots box={currentCard.box} />
+
+        <FlashCard3D
+          key={currentCard.id}
+          front={currentCard.front}
+          back={currentCard.back}
+          flipped={flipped}
+          onFlip={() => {
+            setFlipped((f) => !f);
+            setDeleteConfirm(false);
           }}
         />
-      </div>
 
-      <BoxDots box={currentCard.box} />
-
-      <FlashCard3D
-        key={currentCard.id}
-        front={currentCard.front}
-        back={currentCard.back}
-        flipped={flipped}
-        onFlip={() => setFlipped((f) => !f)}
-      />
-
-      <div
-        className="grid grid-cols-2 gap-3 transition-all duration-300"
-        style={{
-          opacity: flipped ? 1 : 0,
-          transform: flipped ? "translateY(0)" : "translateY(10px)",
-          pointerEvents: flipped ? "auto" : "none",
-        }}
-      >
-        <button
-          onClick={() => handleAnswer(false)}
-          disabled={submitting}
-          className="flex items-center justify-center gap-2.5 py-4 rounded-2xl text-red-400 font-bold text-sm active:scale-[0.97] transition-all duration-200 disabled:opacity-40"
+        {/* Answer buttons */}
+        <div
+          className="grid grid-cols-2 gap-3 transition-all duration-300"
           style={{
-            backgroundColor: "rgba(239,68,68,0.07)",
-            border: "1px solid rgba(239,68,68,0.16)",
+            opacity: flipped ? 1 : 0,
+            transform: flipped ? "translateY(0)" : "translateY(10px)",
+            pointerEvents: flipped ? "auto" : "none",
           }}
         >
-          <XCircle size={16} strokeWidth={2} />
-          Didn&apos;t know
-        </button>
-        <button
-          onClick={() => handleAnswer(true)}
-          disabled={submitting}
-          className="flex items-center justify-center gap-2.5 py-4 rounded-2xl text-emerald-400 font-bold text-sm active:scale-[0.97] transition-all duration-200 disabled:opacity-40"
+          <button
+            onClick={() => handleAnswer(false)}
+            disabled={submitting}
+            className="flex items-center justify-center gap-2.5 py-4 rounded-2xl text-red-400 font-bold text-sm active:scale-[0.97] transition-all duration-200 disabled:opacity-40"
+            style={{
+              backgroundColor: "rgba(239,68,68,0.07)",
+              border: "1px solid rgba(239,68,68,0.16)",
+            }}
+          >
+            <XCircle size={16} strokeWidth={2} />
+            Didn&apos;t know
+          </button>
+          <button
+            onClick={() => handleAnswer(true)}
+            disabled={submitting}
+            className="flex items-center justify-center gap-2.5 py-4 rounded-2xl text-emerald-400 font-bold text-sm active:scale-[0.97] transition-all duration-200 disabled:opacity-40"
+            style={{
+              backgroundColor: "rgba(16,185,129,0.07)",
+              border: "1px solid rgba(16,185,129,0.16)",
+            }}
+          >
+            <CheckCircle2 size={16} strokeWidth={2} />
+            Got it
+          </button>
+        </div>
+
+        {/* D1/A1 — Edit / Delete card (visible once flipped) */}
+        <div
+          className="flex items-center justify-center gap-3 transition-all duration-300"
           style={{
-            backgroundColor: "rgba(16,185,129,0.07)",
-            border: "1px solid rgba(16,185,129,0.16)",
+            opacity: flipped ? 1 : 0,
+            pointerEvents: flipped ? "auto" : "none",
           }}
         >
-          <CheckCircle2 size={16} strokeWidth={2} />
-          Got it
-        </button>
+          <button
+            onClick={() => setEditOpen(true)}
+            className="flex items-center gap-1.5 text-[11px] font-semibold text-white/25 hover:text-white/55 px-3 py-1.5 rounded-full hover:bg-white/[0.05] transition-all duration-200"
+          >
+            <Pencil size={11} />
+            Edit card
+          </button>
+
+          {deleteConfirm ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleDelete}
+                className="text-[11px] font-bold text-red-400 px-3 py-1.5 rounded-full hover:bg-red-400/[0.08] transition-colors"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setDeleteConfirm(false)}
+                className="text-[11px] text-white/30 px-2 py-1.5 rounded-full hover:bg-white/[0.05] transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setDeleteConfirm(true)}
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-white/20 hover:text-red-400 px-3 py-1.5 rounded-full hover:bg-red-400/[0.06] transition-all duration-200"
+            >
+              <Trash2 size={11} />
+              Delete card
+            </button>
+          )}
+
+          <span className="text-[10px] text-white/15 hidden md:block">
+            ← wrong · right →
+          </span>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -525,6 +772,55 @@ function UploadZone({
   );
 }
 
+// ─── Deck summary popover ─────────────────────────────────────────────────────
+
+function DeckSummary({ docId }: { docId: string }) {
+  const { session } = useAuth();
+  const token = session?.access_token;
+  const [summary, setSummary] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+
+  const fetchSummary = useCallback(async () => {
+    if (summary !== null) return;
+    try {
+      const data = await apiGet<{ content: string }>(
+        `/api/v1/documents/${docId}/summary`,
+        token,
+      );
+      setSummary(data.content);
+    } catch {
+      setSummary("");
+    } finally {
+      setLoading(false);
+    }
+  }, [docId, token, summary]);
+
+  const handleToggle = () => {
+    if (!open) fetchSummary();
+    setOpen((v) => !v);
+  };
+
+  if (summary === "") return null;
+
+  return (
+    <div>
+      <button
+        onClick={handleToggle}
+        className="text-[11px] font-medium text-white/25 hover:text-white/50 transition-colors flex items-center gap-1"
+      >
+        <Sparkles size={10} />
+        {open ? "Hide summary" : "AI summary"}
+      </button>
+      {open && (
+        <div className="mt-2 text-xs text-white/45 leading-relaxed border-l-2 border-white/[0.08] pl-3">
+          {loading ? <span className="text-white/20">Loading…</span> : summary}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Deck card ────────────────────────────────────────────────────────────────
 
 function DeckCard({
@@ -533,14 +829,18 @@ function DeckCard({
   assignments,
   onStudy,
   onAssign,
+  onDelete,
 }: {
   doc: DocumentItem;
   folders: Folder[];
   assignments: Record<string, string>;
   onStudy: (id: string) => void;
   onAssign: (docId: string, folderId: string | null) => void;
+  onDelete: (id: string) => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const toast = useToast();
   const name = doc.file_name.replace(/\.pdf$/i, "");
   const hasDue = doc.due_count > 0;
   const hasCards = doc.flashcard_count > 0;
@@ -548,6 +848,15 @@ function DeckCard({
     ? Math.max(4, 100 - (doc.due_count / doc.flashcard_count) * 100)
     : 0;
   const currentFolder = folders.find((f) => assignments[doc.id] === f.id);
+
+  const handleDelete = async () => {
+    try {
+      await onDelete(doc.id);
+      toast(`"${name}" deleted`, "success");
+    } catch {
+      toast("Could not delete deck. Try again.", "error");
+    }
+  };
 
   return (
     <GlassPanel hover glow className="p-5 flex flex-col gap-4">
@@ -573,19 +882,46 @@ function DeckCard({
           </p>
         </div>
 
-        {hasDue && (
-          <span
-            className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0"
-            style={{
-              backgroundColor: "rgba(37,119,255,0.12)",
-              border: "1px solid rgba(37,119,255,0.20)",
-              color: "rgb(37,119,255)",
-            }}
-          >
-            <Sparkles size={9} strokeWidth={2.5} />
-            {doc.due_count}
-          </span>
-        )}
+        {/* A2 — Delete deck */}
+        <div className="flex items-center gap-1 shrink-0">
+          {hasDue && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full"
+              style={{
+                backgroundColor: "rgba(37,119,255,0.12)",
+                border: "1px solid rgba(37,119,255,0.20)",
+                color: "rgb(37,119,255)",
+              }}
+            >
+              <Sparkles size={9} strokeWidth={2.5} />
+              {doc.due_count}
+            </span>
+          )}
+          {deleteConfirm ? (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleDelete}
+                className="text-[10px] font-bold text-red-400 px-1.5 py-0.5 rounded-lg hover:bg-red-400/[0.08] transition-colors"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setDeleteConfirm(false)}
+                className="text-[10px] text-white/30 px-1.5 py-0.5 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setDeleteConfirm(true)}
+              className="text-white/15 hover:text-red-400 p-1 rounded-lg hover:bg-red-400/[0.06] transition-all duration-200"
+              aria-label="Delete deck"
+            >
+              <Trash2 size={12} />
+            </button>
+          )}
+        </div>
       </div>
 
       {hasCards && (
@@ -610,6 +946,9 @@ function DeckCard({
           </div>
         </div>
       )}
+
+      {/* B3 — AI summary */}
+      {hasCards && <DeckSummary docId={doc.id} />}
 
       {/* Folder assignment row */}
       {folders.length > 0 && (
@@ -750,6 +1089,7 @@ function DeckList({
   loading,
   onStudy,
   onAssign,
+  onDelete,
 }: {
   documents: DocumentItem[];
   folders: Folder[];
@@ -757,6 +1097,7 @@ function DeckList({
   loading: boolean;
   onStudy: (id: string) => void;
   onAssign: (docId: string, folderId: string | null) => void;
+  onDelete: (id: string) => void;
 }) {
   if (loading) {
     return (
@@ -802,6 +1143,7 @@ function DeckList({
           assignments={assignments}
           onStudy={onStudy}
           onAssign={onAssign}
+          onDelete={onDelete}
         />
       ))}
     </div>
@@ -822,15 +1164,21 @@ function DashboardView({
     loading,
     uploadState,
     uploadAndProcess,
+    deleteDocument,
     resetUpload,
     totalDue,
     totalCards,
   } = useDocuments();
 
-  const { folders, assignments, createFolder, deleteFolder, assignDocument } =
-    useFolders();
+  const {
+    folders,
+    assignments,
+    createFolder,
+    deleteFolder,
+    renameFolder,
+    assignDocument,
+  } = useFolders();
 
-  // null = folder grid, Folder = folder detail
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
 
   const visibleDocuments = selectedFolder
@@ -888,7 +1236,7 @@ function DashboardView({
           }}
         >
           <div
-            className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-300"
+            className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
             style={{
               backgroundColor: "rgba(37,119,255,0.14)",
               border: "1px solid rgba(37,119,255,0.18)",
@@ -942,9 +1290,9 @@ function DashboardView({
             onSelectFolder={setSelectedFolder}
             onCreateFolder={(name) => createFolder(name)}
             onDeleteFolder={deleteFolder}
+            onRenameFolder={renameFolder}
           />
 
-          {/* All decks below folder grid */}
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/25 mb-4">
               All decks
@@ -956,6 +1304,7 @@ function DashboardView({
               loading={loading}
               onStudy={onStudyDeck}
               onAssign={assignDocument}
+              onDelete={deleteDocument}
             />
           </div>
         </>
@@ -971,6 +1320,7 @@ function DashboardView({
             loading={loading}
             onStudy={onStudyDeck}
             onAssign={assignDocument}
+            onDelete={deleteDocument}
           />
         </div>
       )}

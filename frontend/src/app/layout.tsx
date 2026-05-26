@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { AuthProvider } from "@/store/AuthContext";
 import MainLayout from "@/components/MainLayout";
+import { ToastProvider } from "@/components/ui/Toast";
 import "./globals.css";
 
 const inter = Inter({
@@ -56,7 +57,9 @@ export default function RootLayout({
           }}
         />
         <AuthProvider>
-          <MainLayout>{children}</MainLayout>
+          <ToastProvider>
+            <MainLayout>{children}</MainLayout>
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>

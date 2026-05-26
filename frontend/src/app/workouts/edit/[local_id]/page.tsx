@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, CheckCircle } from "lucide-react";
 import { db } from "@/lib/db";
+import { useToast } from "@/components/ui/Toast";
 import {
   DraftExercise,
   DraftSet,
@@ -15,6 +16,7 @@ import {
 export default function EditWorkoutPage() {
   const router = useRouter();
   const { local_id } = useParams<{ local_id: string }>();
+  const toast = useToast();
 
   const [workoutName, setWorkoutName] = useState("");
   const [startedAt, setStartedAt] = useState("");
@@ -111,6 +113,7 @@ export default function EditWorkoutPage() {
       // Update workout header and mark pending so useSyncManager triggers PUT
       await db.workouts.update(local_id, {
         name: workoutName.trim() || undefined,
+        started_at: startedAt,
         sync_status: "pending",
       });
 
@@ -136,6 +139,7 @@ export default function EditWorkoutPage() {
         }
       }
 
+      toast("Entreno actualizado", "success");
       router.push("/workouts");
     } catch {
       setError("No se pudo guardar los cambios. Inténtalo de nuevo.");
@@ -143,12 +147,13 @@ export default function EditWorkoutPage() {
     }
   };
 
-  const startTime = startedAt
-    ? new Date(startedAt).toLocaleTimeString("es-ES", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
+  // Format ISO to datetime-local value (YYYY-MM-DDTHH:mm)
+  const toDatetimeLocal = (iso: string) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
 
   if (loading) {
     return (
@@ -191,7 +196,7 @@ export default function EditWorkoutPage() {
         </button>
       </div>
 
-      <div className="mb-8 space-y-1.5">
+      <div className="mb-8 space-y-2">
         <input
           type="text"
           value={workoutName}
@@ -199,10 +204,21 @@ export default function EditWorkoutPage() {
           placeholder="Nombre del entreno (opcional)"
           className="w-full bg-transparent text-2xl font-bold tracking-tight placeholder-foreground/15 focus:outline-none"
         />
-        {startTime && (
-          <p className="text-xs text-foreground/30 font-medium">
-            Iniciado a las {startTime}
-          </p>
+        {/* C4 — editable start time */}
+        {startedAt && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-foreground/30 font-medium shrink-0">
+              Iniciado:
+            </span>
+            <input
+              type="datetime-local"
+              value={toDatetimeLocal(startedAt)}
+              onChange={(e) =>
+                setStartedAt(new Date(e.target.value).toISOString())
+              }
+              className="bg-transparent text-xs text-foreground/40 focus:text-foreground/70 focus:outline-none border-b border-white/[0.07] focus:border-white/20 transition-colors pb-0.5"
+            />
+          </div>
         )}
       </div>
 
