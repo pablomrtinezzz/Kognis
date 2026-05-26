@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "mkdir -p .next/cache .next/dev && next dev",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint"
@@ -19,7 +19,8 @@
     "recharts": "^3.8.1"
   },
   "overrides": {
-    "serialize-javascript": "^6.0.2"
+    "serialize-javascript": "^7.0.5",
+    "postcss": "^8.5.15"
   },
   "devDependencies": {
     "@types/react": "19.2.15",

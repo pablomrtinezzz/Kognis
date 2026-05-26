@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import datetime, timezone
 
@@ -25,7 +26,7 @@ _TEXT_PREVIEW_LENGTH = 500
 
 @router.get("/", response_model=list[DocumentListItem])
 async def list_documents(user_id: str = Depends(get_current_user)):
-    """List all documents for the authenticated user with per-document flashcard counts."""
+    """List all documents for the current user with per-document flashcard counts."""
     try:
         docs_res = (
             db.table("documents")
@@ -199,34 +200,57 @@ async def process_document(
             detail="Document has no extractable text to process.",
         )
 
-    # Chunk and analyze
+    # Chunk and analyze — all chunks in parallel to avoid blocking the worker
     chunks = chunk_text(raw_text)
+    raw_results = await asyncio.gather(
+        *[analyze_chunk(chunk) for chunk in chunks],
+        return_exceptions=True,
+    )
+
     results = []
-    for chunk in chunks:
-        try:
-            analysis = await analyze_chunk(chunk)
-            results.append(analysis)
-        except Exception as e:
+    for i, r in enumerate(raw_results):
+        if isinstance(r, Exception):
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Gemini analysis failed on chunk {len(results) + 1}: {str(e)}",
-            ) from e
+                detail=f"Gemini analysis failed on chunk {i + 1}: {str(r)}",
+            )
+        results.append(r)
 
-    # Merge all chunk results into a single summary and flat flashcard list
+    # Merge all chunk results — all Gemini work is done before touching the DB
     combined_summary = "\n\n".join(r.summary for r in results)
     combined_flashcards = [fc for r in results for fc in r.flashcards]
 
-    # Replace previous processing results (idempotent re-run support)
-    try:
-        db.table("document_summaries").delete().eq("document_id", document_id).execute()
-        db.table("flashcards").delete().eq("document_id", document_id).execute()
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to clear previous results: {str(e)}",
-        ) from e
+    flashcard_rows = [
+        {
+            "document_id": document_id,
+            "user_id": user_id,
+            "front": fc.front,
+            "back": fc.back,
+        }
+        for fc in combined_flashcards
+    ]
 
-    # Persist summary
+    # Snapshot old record IDs before writing anything — used for cleanup at the end.
+    # This ensures old data is only deleted AFTER both inserts succeed, preventing
+    # data loss if an insert fails mid-way through the re-processing flow.
+    old_summary_ids = [
+        r["id"]
+        for r in db.table("document_summaries")
+        .select("id")
+        .eq("document_id", document_id)
+        .execute()
+        .data
+    ]
+    old_flashcard_ids = [
+        r["id"]
+        for r in db.table("flashcards")
+        .select("id")
+        .eq("document_id", document_id)
+        .execute()
+        .data
+    ]
+
+    # Insert new summary
     try:
         db.table("document_summaries").insert(
             {
@@ -241,24 +265,21 @@ async def process_document(
             detail=f"Failed to save summary: {str(e)}",
         ) from e
 
-    # Persist flashcards
-    if combined_flashcards:
+    # Insert new flashcards
+    if flashcard_rows:
         try:
-            flashcard_rows = [
-                {
-                    "document_id": document_id,
-                    "user_id": user_id,
-                    "front": fc.front,
-                    "back": fc.back,
-                }
-                for fc in combined_flashcards
-            ]
             db.table("flashcards").insert(flashcard_rows).execute()
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to save flashcards: {str(e)}",
             ) from e
+
+    # Both inserts succeeded — delete the previous generation by ID
+    if old_summary_ids:
+        db.table("document_summaries").delete().in_("id", old_summary_ids).execute()
+    if old_flashcard_ids:
+        db.table("flashcards").delete().in_("id", old_flashcard_ids).execute()
 
     return ProcessResponse(
         document_id=document_id,
