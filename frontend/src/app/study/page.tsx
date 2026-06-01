@@ -791,6 +791,238 @@ function UploadZone({
   );
 }
 
+// ─── ABC Quiz ─────────────────────────────────────────────────────────────────
+
+interface AbcTest {
+  id: string;
+  question: string;
+  options: string[];
+  correct_index: number;
+}
+
+function AbcQuizPanel({ docId }: { docId: string }) {
+  const { session } = useAuth();
+  const token = session?.access_token;
+
+  const [tests, setTests] = useState<AbcTest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [queue, setQueue] = useState<AbcTest[]>([]);
+  const [current, setCurrent] = useState(0);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [score, setScore] = useState(0);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    apiGet<AbcTest[]>(`/api/v1/documents/${docId}/abc-tests`, token)
+      .then((data) => {
+        setTests(data);
+        setQueue([...data].sort(() => Math.random() - 0.5));
+      })
+      .catch(() => setTests([]))
+      .finally(() => setLoading(false));
+  }, [docId, token]);
+
+  const restart = () => {
+    setQueue([...tests].sort(() => Math.random() - 0.5));
+    setCurrent(0);
+    setSelected(null);
+    setScore(0);
+    setDone(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-2 py-2">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="h-8 rounded-xl animate-pulse"
+            style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (tests.length === 0) {
+    return (
+      <p className="text-xs text-white/25 italic py-2">
+        Sin tests disponibles. Vuelve a procesar el documento para generarlos.
+      </p>
+    );
+  }
+
+  if (done) {
+    const pct = Math.round((score / queue.length) * 100);
+    const color =
+      pct >= 80
+        ? "rgb(16,185,129)"
+        : pct >= 50
+          ? "rgb(37,119,255)"
+          : "rgb(239,68,68)";
+    return (
+      <div className="flex flex-col items-center gap-4 py-3">
+        <div
+          className="w-16 h-16 rounded-full flex flex-col items-center justify-center"
+          style={{
+            backgroundColor: `${color}18`,
+            border: `1px solid ${color}30`,
+          }}
+        >
+          <span className="text-xl font-bold tabular-nums" style={{ color }}>
+            {pct}%
+          </span>
+        </div>
+        <div className="text-center">
+          <p className="text-sm font-semibold text-white/80">
+            {score}/{queue.length} correctas
+          </p>
+          <p className="text-[11px] text-white/30 mt-0.5">
+            {pct >= 80
+              ? "¡Excelente dominio!"
+              : pct >= 50
+                ? "Sigue practicando"
+                : "Repasa el material"}
+          </p>
+        </div>
+        <button
+          onClick={restart}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 active:scale-[0.97]"
+          style={{
+            backgroundColor: "rgba(37,119,255,0.10)",
+            border: "1px solid rgba(37,119,255,0.20)",
+            color: "rgb(37,119,255)",
+          }}
+        >
+          <RotateCcw size={12} strokeWidth={2.5} />
+          Repetir
+        </button>
+      </div>
+    );
+  }
+
+  const q = queue[current];
+  const answered = selected !== null;
+  const isLast = current + 1 >= queue.length;
+
+  const handleSelect = (idx: number) => {
+    if (answered) return;
+    setSelected(idx);
+    if (idx === q.correct_index) setScore((s) => s + 1);
+  };
+
+  const handleNext = () => {
+    if (isLast) {
+      setDone(true);
+    } else {
+      setCurrent((c) => c + 1);
+      setSelected(null);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Progress bar + counter */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-[3px] rounded-full bg-white/[0.06] overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${((current + (answered ? 1 : 0)) / queue.length) * 100}%`,
+              background:
+                "linear-gradient(to right, rgba(37,119,255,0.70), rgb(37,119,255))",
+            }}
+          />
+        </div>
+        <span className="text-[10px] text-white/30 font-semibold tabular-nums shrink-0">
+          {current + 1}/{queue.length}
+        </span>
+      </div>
+
+      {/* Question */}
+      <p className="text-sm font-semibold text-white/80 leading-snug">
+        {q.question}
+      </p>
+
+      {/* Options */}
+      <div className="flex flex-col gap-1.5">
+        {q.options.map((opt, idx) => {
+          const isCorrect = idx === q.correct_index;
+          const isSelected = idx === selected;
+          let bg = "rgba(255,255,255,0.03)";
+          let border = "rgba(255,255,255,0.07)";
+          let textColor = "rgba(255,255,255,0.60)";
+          let labelColor = "rgba(255,255,255,0.20)";
+
+          if (answered) {
+            if (isCorrect) {
+              bg = "rgba(16,185,129,0.10)";
+              border = "rgba(16,185,129,0.30)";
+              textColor = "rgba(16,185,129,0.90)";
+              labelColor = "rgba(16,185,129,0.60)";
+            } else if (isSelected) {
+              bg = "rgba(239,68,68,0.08)";
+              border = "rgba(239,68,68,0.25)";
+              textColor = "rgba(239,68,68,0.70)";
+              labelColor = "rgba(239,68,68,0.40)";
+            } else {
+              textColor = "rgba(255,255,255,0.20)";
+              labelColor = "rgba(255,255,255,0.10)";
+            }
+          }
+
+          return (
+            <button
+              key={idx}
+              onClick={() => handleSelect(idx)}
+              disabled={answered}
+              className="flex items-start gap-2.5 w-full text-left px-3 py-2.5 rounded-xl transition-all duration-200"
+              style={{
+                backgroundColor: bg,
+                border: `1px solid ${border}`,
+                cursor: answered ? "default" : "pointer",
+              }}
+            >
+              <span
+                className="shrink-0 w-4 h-4 rounded-md flex items-center justify-center text-[9px] font-bold mt-[1px]"
+                style={{
+                  backgroundColor: `${labelColor}30`,
+                  color: labelColor,
+                  border: `1px solid ${labelColor}`,
+                }}
+              >
+                {String.fromCharCode(65 + idx)}
+              </span>
+              <span
+                className="text-xs leading-snug font-medium"
+                style={{ color: textColor }}
+              >
+                {opt}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Next / Finish button */}
+      {answered && (
+        <button
+          onClick={handleNext}
+          className="w-full py-2 rounded-xl text-xs font-bold transition-all duration-200 active:scale-[0.98] mt-1"
+          style={{
+            backgroundColor: "rgba(37,119,255,0.10)",
+            border: "1px solid rgba(37,119,255,0.20)",
+            color: "rgb(37,119,255)",
+          }}
+        >
+          {isLast ? "Ver resultado →" : "Siguiente →"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Summary renderer ─────────────────────────────────────────────────────────
 
 function SummaryContent({ text }: { text: string }) {
@@ -896,7 +1128,9 @@ function DeckCard({
   onAssign: (docId: string, folderId: string | null) => void;
   onDelete: (id: string) => void;
 }) {
-  const [tab, setTab] = useState<"flashcards" | "resumen">("flashcards");
+  const [tab, setTab] = useState<"flashcards" | "resumen" | "tests">(
+    "flashcards",
+  );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const toast = useToast();
@@ -993,6 +1227,7 @@ function DeckCard({
             [
               { id: "flashcards", label: "Flashcards" },
               { id: "resumen", label: "Resumen" },
+              { id: "tests", label: "Tests" },
             ] as const
           ).map(({ id, label }) => (
             <button
@@ -1124,6 +1359,9 @@ function DeckCard({
 
       {/* ── Resumen tab ── */}
       {hasCards && tab === "resumen" && <DeckSummaryPanel docId={doc.id} />}
+
+      {/* ── Tests tab ── */}
+      {hasCards && tab === "tests" && <AbcQuizPanel docId={doc.id} />}
     </GlassPanel>
   );
 }

@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 # Import API routers and scheduler
-from src.api import analytics, documents, flashcards, goals, profiles, workouts
+from src.api import analytics, documents, flashcards, folders, goals, profiles, workouts
 from src.core.config import settings
 from src.core.scheduler import scheduler
 
@@ -65,6 +65,7 @@ app.include_router(goals.router, prefix="/api/v1")
 app.include_router(workouts.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
+app.include_router(folders.router, prefix="/api/v1")
 app.include_router(flashcards.router, prefix="/api/v1")
 
 

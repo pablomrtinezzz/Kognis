@@ -64,6 +64,14 @@ export function useDocuments() {
       try {
         const form = new FormData();
         form.append("file", file);
+        // Look up the server_id for the local folder so the backend can
+        // store folder_id on the documents row.
+        if (folderId) {
+          const localFolder = await db.folders.get(folderId);
+          if (localFolder?.server_id) {
+            form.append("folder_id", localFolder.server_id);
+          }
+        }
         uploaded = await apiUpload<{ id: string }>(
           "/api/v1/documents/upload",
           form,
@@ -77,6 +85,8 @@ export function useDocuments() {
         return;
       }
 
+      // Always write the local assignment regardless of whether the server
+      // accepted folder_id (graceful degradation for unsynced folders).
       if (folderId) {
         await db.folder_assignments.put({
           doc_id: uploaded.id,

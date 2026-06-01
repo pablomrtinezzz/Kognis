@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FolderOpen, Pencil, Plus, X } from "lucide-react";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import type { DocumentItem } from "@/hooks/useDocuments";
-import { db } from "@/lib/db";
+import { db, type LocalFolder } from "@/lib/db";
+import { useAuth } from "@/store/AuthContext";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/apiClient";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,7 +16,15 @@ export interface Folder {
   colorIndex: number;
 }
 
-// ─── Palette — each entry drives the folder-card colour scheme ────────────────
+interface ServerFolder {
+  id: string;
+  local_id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+}
+
+// ─── Palette ──────────────────────────────────────────────────────────────────
 
 const PALETTE = [
   {
@@ -52,8 +62,14 @@ const PALETTE = [
 // ─── useFolders hook ──────────────────────────────────────────────────────────
 
 export function useFolders() {
+  const { session } = useAuth();
+  const token = session?.access_token;
+
   const [folders, setFolders] = useState<Folder[]>([]);
   const [assignments, setAssignments] = useState<Record<string, string>>({});
+
+  // Prevent concurrent syncs
+  const syncing = useRef(false);
 
   const reload = useCallback(async () => {
     const [allFolders, allAssignments] = await Promise.all([
@@ -66,41 +82,125 @@ export function useFolders() {
     setAssignments(map);
   }, []);
 
+  // Sync server folders into Dexie (runs in background, never blocks UI).
+  // Strategy: for each server folder, find the local copy by local_id match
+  // and backfill server_id + mark as synced.  New server-only folders
+  // (e.g. created on another device) are inserted locally.
+  const syncFromServer = useCallback(async () => {
+    if (!token || syncing.current) return;
+    syncing.current = true;
+    try {
+      const serverFolders = await apiGet<ServerFolder[]>(
+        "/api/v1/folders/",
+        token,
+      );
+      for (const sf of serverFolders) {
+        const local = await db.folders.get(sf.local_id);
+        if (local) {
+          if (local.server_id !== sf.id) {
+            await db.folders.update(sf.local_id, {
+              server_id: sf.id,
+              sync_status: "synced",
+            });
+          }
+        } else {
+          // Folder exists on server but not locally (e.g. created on another device)
+          await db.folders.put({
+            id: sf.local_id,
+            server_id: sf.id,
+            name: sf.name,
+            colorIndex: 0,
+            created_at: sf.created_at,
+            sync_status: "synced",
+          });
+        }
+      }
+      await reload();
+    } catch {
+      // Offline or server error — local data is authoritative
+    } finally {
+      syncing.current = false;
+    }
+  }, [token, reload]);
+
   useEffect(() => {
     reload();
   }, [reload]);
 
+  useEffect(() => {
+    if (session) syncFromServer();
+  }, [session, syncFromServer]);
+
   const createFolder = useCallback(
     async (name: string): Promise<Folder> => {
-      const next: Folder = {
+      const newFolder: LocalFolder = {
         id: crypto.randomUUID(),
         name: name.trim(),
         colorIndex: folders.length % PALETTE.length,
+        created_at: new Date().toISOString(),
+        sync_status: "pending",
       };
-      await db.folders.put({ ...next, created_at: new Date().toISOString() });
-      setFolders((prev) => [...prev, next]);
-      return next;
+
+      await db.folders.put(newFolder);
+      setFolders((prev) => [...prev, newFolder]);
+
+      // Push to server non-blocking — update server_id on success
+      if (token) {
+        apiPost<ServerFolder>(
+          "/api/v1/folders/",
+          { local_id: newFolder.id, name: newFolder.name },
+          token,
+        )
+          .then((sf) =>
+            db.folders.update(newFolder.id, {
+              server_id: sf.id,
+              sync_status: "synced",
+            }),
+          )
+          .catch(() =>
+            db.folders.update(newFolder.id, { sync_status: "error" }),
+          );
+      }
+
+      return newFolder;
     },
-    [folders.length],
+    [folders.length, token],
   );
 
   const deleteFolder = useCallback(
     async (id: string) => {
+      const folder = await db.folders.get(id);
       await db.folders.delete(id);
       await db.folder_assignments.where("folder_id").equals(id).delete();
       await reload();
+
+      if (token && folder?.server_id) {
+        apiDelete(`/api/v1/folders/${folder.server_id}`, token).catch(() => {});
+      }
     },
-    [reload],
+    [reload, token],
   );
 
-  const renameFolder = useCallback(async (id: string, newName: string) => {
-    const trimmed = newName.trim();
-    if (!trimmed) return;
-    await db.folders.update(id, { name: trimmed });
-    setFolders((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, name: trimmed } : f)),
-    );
-  }, []);
+  const renameFolder = useCallback(
+    async (id: string, newName: string) => {
+      const trimmed = newName.trim();
+      if (!trimmed) return;
+      const folder = await db.folders.get(id);
+      await db.folders.update(id, { name: trimmed });
+      setFolders((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, name: trimmed } : f)),
+      );
+
+      if (token && folder?.server_id) {
+        apiPatch(
+          `/api/v1/folders/${folder.server_id}`,
+          { name: trimmed },
+          token,
+        ).catch(() => {});
+      }
+    },
+    [token],
+  );
 
   const assignDocument = useCallback(
     async (docId: string, folderId: string | null) => {
@@ -130,7 +230,7 @@ export function useFolders() {
   };
 }
 
-// ─── Inline "create folder" form ─────────────────────────────────────────────
+// ─── Inline create-folder form ────────────────────────────────────────────────
 
 function CreateFolderInline({
   onConfirm,
@@ -248,7 +348,6 @@ export function FolderGrid({
         )}
       </div>
 
-      {/* Inline create form */}
       {creating && (
         <CreateFolderInline
           onConfirm={handleCreate}
@@ -312,7 +411,6 @@ export function FolderGrid({
                 className="p-4 flex flex-col gap-3 cursor-pointer group"
                 onClick={() => onSelectFolder(folder)}
               >
-                {/* Folder icon */}
                 <div
                   className="w-10 h-10 rounded-2xl flex items-center justify-center"
                   style={{
@@ -327,7 +425,6 @@ export function FolderGrid({
                   />
                 </div>
 
-                {/* Name + count */}
                 <div className="flex-1 min-w-0">
                   {renamingId === folder.id ? (
                     <input
@@ -360,7 +457,6 @@ export function FolderGrid({
                   </p>
                 </div>
 
-                {/* Due badge + actions */}
                 <div className="flex items-center justify-between">
                   {due > 0 ? (
                     <span

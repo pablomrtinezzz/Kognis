@@ -29,15 +29,19 @@ export interface LocalWorkoutTemplate {
 }
 
 export interface LocalFolder {
-  id: string;
+  id: string; // PK — client-generated UUID (sent as local_id to server)
   name: string;
   colorIndex: number;
   created_at: string;
+  // Sync fields populated after the folder is pushed to the backend
+  server_id?: string; // Supabase UUID assigned by the server
+  user_id?: string;
+  sync_status: SyncStatus;
 }
 
 export interface LocalFolderAssignment {
-  doc_id: string; // PK — document UUID
-  folder_id: string;
+  doc_id: string; // PK — document server UUID
+  folder_id: string; // FK → LocalFolder.id (client UUID)
 }
 
 export interface LocalWorkout {
@@ -88,14 +92,14 @@ export class KognisDatabase extends Dexie {
   constructor() {
     super("KognisDB");
 
-    // v1 — original schema (must be declared for Dexie migrations to work)
+    // v1 — original schema
     this.version(1).stores({
       mutations: "++id, type, createdAt",
       goals: "id, category",
       workouts: "id, date",
     });
 
-    // v2 — offline-first workout model + new tables
+    // v2 — offline-first workout model
     this.version(2)
       .stores({
         mutations: "++id, type, createdAt",
@@ -105,11 +109,11 @@ export class KognisDatabase extends Dexie {
         sets: "local_id, workout_exercise_local_id, sync_status",
       })
       .upgrade(async (tx) => {
-        // v1 workouts used an incompatible schema (PK was 'id', not 'local_id')
+        // v1 workouts had an incompatible PK ('id' vs 'local_id')
         await tx.table("workouts").clear();
       });
 
-    // v3 — add started_at index to workouts to allow ordered queries
+    // v3 — started_at index on workouts
     this.version(3).stores({
       mutations: "++id, type, createdAt",
       goals: "id, category",
@@ -118,7 +122,7 @@ export class KognisDatabase extends Dexie {
       sets: "local_id, workout_exercise_local_id, sync_status",
     });
 
-    // v4 — add workout_templates table (user-editable reusable routines)
+    // v4 — workout_templates table
     this.version(4).stores({
       mutations: "++id, type, createdAt",
       goals: "id, category",
@@ -139,6 +143,30 @@ export class KognisDatabase extends Dexie {
       folders: "id, name, created_at",
       folder_assignments: "doc_id, folder_id",
     });
+
+    // v6 — folders gains server_id + sync_status for offline-first backend sync
+    this.version(6)
+      .stores({
+        mutations: "++id, type, createdAt",
+        goals: "id, category",
+        workouts: "local_id, server_id, sync_status, user_id, started_at",
+        workout_exercises: "local_id, workout_local_id, sync_status",
+        sets: "local_id, workout_exercise_local_id, sync_status",
+        workout_templates: "id, name, created_at",
+        folders: "id, server_id, sync_status, name, created_at",
+        folder_assignments: "doc_id, folder_id",
+      })
+      .upgrade(async (tx) => {
+        // Backfill sync_status for any folders created before v6
+        await tx
+          .table("folders")
+          .toCollection()
+          .modify((folder: LocalFolder) => {
+            if (!folder.sync_status) {
+              folder.sync_status = "pending";
+            }
+          });
+      });
   }
 }
 

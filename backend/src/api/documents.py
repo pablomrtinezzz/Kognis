@@ -1,20 +1,25 @@
 import asyncio
+import logging
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 
 import fitz  # PyMuPDF
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, status
 
 from src.api.deps import get_current_user
 from src.core.database import db
 from src.models.document import (
+    AbcTestItem,
     DocumentListItem,
     DocumentSummary,
     DocumentUploadResponse,
     ProcessResponse,
 )
-from src.services.gemini_service import analyze_chunk
+from src.services.gemini_service import analyze_chunk, embed_text
 from src.utils.text_processor import chunk_text
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["Cognitive Module"])
 
@@ -26,16 +31,24 @@ _TEXT_PREVIEW_LENGTH = 500
 
 
 @router.get("/", response_model=list[DocumentListItem])
-async def list_documents(user_id: str = Depends(get_current_user)):
-    """List all documents for the current user with per-document flashcard counts."""
+async def list_documents(
+    user_id: str = Depends(get_current_user),
+    folder_id: Optional[str] = Query(
+        default=None,
+        description="Filter by server-side folder UUID. Omit to return all documents.",
+    ),
+):
+    """List documents for the current user with per-document flashcard counts."""
     try:
-        docs_res = (
+        query = (
             db.table("documents")
-            .select("id, file_name, created_at")
+            .select("id, file_name, created_at, folder_id")
             .eq("user_id", user_id)
             .order("created_at", desc=True)
-            .execute()
         )
+        if folder_id is not None:
+            query = query.eq("folder_id", folder_id)
+        docs_res = query.execute()
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch documents: {str(e)}"
@@ -74,6 +87,7 @@ async def list_documents(user_id: str = Depends(get_current_user)):
             created_at=d["created_at"],
             flashcard_count=total_by_doc.get(d["id"], 0),
             due_count=due_by_doc.get(d["id"], 0),
+            folder_id=d.get("folder_id"),
         )
         for d in docs_res.data
     ]
@@ -90,9 +104,12 @@ async def list_documents(user_id: str = Depends(get_current_user)):
 async def upload_document(
     file: UploadFile,
     user_id: str = Depends(get_current_user),
+    folder_id: Optional[str] = Form(
+        default=None,
+        description="Server folder UUID to assign the document to on upload.",
+    ),
 ):
     """Ingest a PDF: extract text in-memory, upload to Storage, persist metadata."""
-
     if file.content_type != "application/pdf":
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -131,12 +148,15 @@ async def upload_document(
             detail=f"Storage upload failed: {str(e)}",
         ) from e
 
-    record = {
+    record: dict = {
         "user_id": user_id,
         "file_name": file.filename,
         "storage_path": storage_filename,
         "raw_text": raw_text,
     }
+    if folder_id is not None:
+        record["folder_id"] = folder_id
+
     try:
         res = db.table("documents").insert(record).execute()
         saved = res.data[0]
@@ -154,6 +174,7 @@ async def upload_document(
         text_preview=raw_text[:_TEXT_PREVIEW_LENGTH],
         page_count=page_count,
         created_at=saved["created_at"],
+        folder_id=saved.get("folder_id"),
     )
 
 
@@ -170,12 +191,16 @@ async def process_document(
     user_id: str = Depends(get_current_user),
 ):
     """
-    Chunk the document's raw text, run each chunk through Gemini,
-    then persist the merged summary and flashcards.
-    Calling this endpoint again replaces any previous results (idempotent).
-    """
+    Full AI pipeline for a document:
+      1. Semantic chunking of raw text.
+      2. Concurrent embedding of all chunks via text-embedding-004.
+      3. Insert chunks + embeddings into document_chunks.
+      4. Concurrent LLM analysis (summary, flashcards, ABC tests) per chunk.
+      5. Persist merged summary, flashcards, and ABC tests.
 
-    # Fetch document and verify ownership
+    Idempotent: existing document_chunks, abc_tests, flashcards, and
+    document_summaries are replaced atomically (snapshot-then-delete).
+    """
     try:
         doc_res = (
             db.table("documents")
@@ -201,42 +226,23 @@ async def process_document(
             detail="Document has no extractable text to process.",
         )
 
-    # Chunk and analyze — all chunks in parallel to avoid blocking the worker
+    # ── 1. Chunk ──────────────────────────────────────────────────────────────
+
     chunks = chunk_text(raw_text)
-    raw_results = await asyncio.gather(
-        *[analyze_chunk(chunk) for chunk in chunks],
-        return_exceptions=True,
-    )
 
-    results = []
-    for i, r in enumerate(raw_results):
-        if isinstance(r, Exception):
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Gemini analysis failed on chunk {i + 1}: {str(r)}",
-            )
-        results.append(r)
+    # ── Snapshot old IDs for idempotent cleanup ───────────────────────────────
 
-    # Merge all chunk results — all Gemini work is done before touching the DB
-    combined_summary = "\n\n".join(r.summary for r in results)
-    combined_flashcards = [fc for r in results for fc in r.flashcards]
-
-    flashcard_rows = [
-        {
-            "document_id": document_id,
-            "user_id": user_id,
-            "front": fc.front,
-            "back": fc.back,
-        }
-        for fc in combined_flashcards
-    ]
-
-    # Snapshot old record IDs before writing anything — used for cleanup at the end.
-    # This ensures old data is only deleted AFTER both inserts succeed, preventing
-    # data loss if an insert fails mid-way through the re-processing flow.
-    old_summary_ids = [
+    old_chunk_ids = [
         r["id"]
-        for r in db.table("document_summaries")
+        for r in db.table("document_chunks")
+        .select("id")
+        .eq("document_id", document_id)
+        .execute()
+        .data
+    ]
+    old_abc_ids = [
+        r["id"]
+        for r in db.table("abc_tests")
         .select("id")
         .eq("document_id", document_id)
         .execute()
@@ -250,8 +256,85 @@ async def process_document(
         .execute()
         .data
     ]
+    old_summary_ids = [
+        r["id"]
+        for r in db.table("document_summaries")
+        .select("id")
+        .eq("document_id", document_id)
+        .execute()
+        .data
+    ]
 
-    # Insert new summary
+    # ── 2. Concurrent embeddings ──────────────────────────────────────────────
+
+    raw_embeddings = await asyncio.gather(
+        *[embed_text(chunk) for chunk in chunks],
+        return_exceptions=True,
+    )
+
+    embeddings: list[list[float]] = []
+    for i, result in enumerate(raw_embeddings):
+        if isinstance(result, Exception):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Embedding failed on chunk {i + 1}: {str(result)}",
+            )
+        embeddings.append(result)
+
+    # ── 3. Insert document_chunks ─────────────────────────────────────────────
+
+    chunk_rows = [
+        {
+            "document_id": document_id,
+            "user_id": user_id,
+            "chunk_index": i,
+            "content": chunk,
+            # PostgREST cannot cast a JSON array to vector automatically;
+            # send it as the text literal that pgvector's input parser expects.
+            "embedding": "[" + ",".join(str(v) for v in embedding) + "]",
+        }
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=True))
+    ]
+
+    try:
+        db.table("document_chunks").insert(chunk_rows).execute()
+    except Exception as e:
+        logger.error("document_chunks insert failed — %r", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save document chunks: {repr(e)}",
+        ) from e
+
+    # ── 4. Concurrent LLM analysis ────────────────────────────────────────────
+
+    raw_analyses = await asyncio.gather(
+        *[analyze_chunk(chunk) for chunk in chunks],
+        return_exceptions=True,
+    )
+
+    analyses = []
+    for i, result in enumerate(raw_analyses):
+        if isinstance(result, Exception):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Gemini analysis failed on chunk {i + 1}: {str(result)}",
+            )
+        analyses.append(result)
+
+    # ── 5. Persist merged results ─────────────────────────────────────────────
+
+    combined_summary = "\n\n".join(r.summary for r in analyses)
+    combined_flashcards = [fc for r in analyses for fc in r.flashcards]
+    combined_abc_tests = [t for r in analyses for t in r.abc_tests]
+
+    logger.info(
+        "document %s — chunks=%d flashcards=%d abc_tests=%d",
+        document_id,
+        len(analyses),
+        len(combined_flashcards),
+        len(combined_abc_tests),
+    )
+
     try:
         db.table("document_summaries").insert(
             {
@@ -266,8 +349,16 @@ async def process_document(
             detail=f"Failed to save summary: {str(e)}",
         ) from e
 
-    # Insert new flashcards
-    if flashcard_rows:
+    if combined_flashcards:
+        flashcard_rows = [
+            {
+                "document_id": document_id,
+                "user_id": user_id,
+                "front": fc.front,
+                "back": fc.back,
+            }
+            for fc in combined_flashcards
+        ]
         try:
             db.table("flashcards").insert(flashcard_rows).execute()
         except Exception as e:
@@ -276,17 +367,41 @@ async def process_document(
                 detail=f"Failed to save flashcards: {str(e)}",
             ) from e
 
-    # Both inserts succeeded — delete the previous generation by ID
-    if old_summary_ids:
-        db.table("document_summaries").delete().in_("id", old_summary_ids).execute()
+    if combined_abc_tests:
+        abc_rows = [
+            {
+                "document_id": document_id,
+                "user_id": user_id,
+                "question": t.question,
+                "options": t.options,
+                "correct_index": t.correct_index,
+            }
+            for t in combined_abc_tests
+        ]
+        try:
+            db.table("abc_tests").insert(abc_rows).execute()
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to save ABC tests: {str(e)}",
+            ) from e
+
+    # ── Delete superseded records ─────────────────────────────────────────────
+
+    if old_chunk_ids:
+        db.table("document_chunks").delete().in_("id", old_chunk_ids).execute()
+    if old_abc_ids:
+        db.table("abc_tests").delete().in_("id", old_abc_ids).execute()
     if old_flashcard_ids:
         db.table("flashcards").delete().in_("id", old_flashcard_ids).execute()
+    if old_summary_ids:
+        db.table("document_summaries").delete().in_("id", old_summary_ids).execute()
 
     return ProcessResponse(
         document_id=document_id,
         chunks_processed=len(chunks),
         flashcards_generated=len(combined_flashcards),
-        summary_preview=combined_summary[:500],
+        summary_preview=combined_summary[:_TEXT_PREVIEW_LENGTH],
     )
 
 
@@ -346,7 +461,7 @@ async def delete_document(
     document_id: str,
     user_id: str = Depends(get_current_user),
 ):
-    """Cascade-delete a document, its flashcards, summaries, and storage."""
+    """Cascade-delete a document and all associated data from storage."""
     try:
         doc_res = (
             db.table("documents")
@@ -364,27 +479,65 @@ async def delete_document(
     if doc["user_id"] != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden.")
 
-    # Cascade: delete flashcards and summaries first
     try:
+        db.table("document_chunks").delete().eq("document_id", document_id).execute()
+        db.table("abc_tests").delete().eq("document_id", document_id).execute()
         db.table("flashcards").delete().eq("document_id", document_id).execute()
         db.table("document_summaries").delete().eq("document_id", document_id).execute()
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete associated data: {str(e)}",
-        ) from e
-
-    # Remove from storage (non-fatal if already gone)
-    if doc.get("storage_path"):
-        try:
-            db.storage.from_("documents").remove([doc["storage_path"]])
-        except Exception:
-            pass
-
-    try:
         db.table("documents").delete().eq("id", document_id).execute()
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete document: {str(e)}",
         ) from e
+
+    if doc.get("storage_path"):
+        try:
+            db.storage.from_("documents").remove([doc["storage_path"]])
+        except Exception:
+            pass
+
+
+# ── ABC Tests ─────────────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/{document_id}/abc-tests",
+    response_model=list[AbcTestItem],
+    status_code=status.HTTP_200_OK,
+)
+async def get_abc_tests(
+    document_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Return AI-generated multiple-choice tests for a document."""
+    try:
+        doc_res = (
+            db.table("documents")
+            .select("id, user_id")
+            .eq("id", document_id)
+            .single()
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found."
+        ) from e
+
+    if doc_res.data["user_id"] != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden.")
+
+    try:
+        res = (
+            db.table("abc_tests")
+            .select("id, question, options, correct_index")
+            .eq("document_id", document_id)
+            .order("created_at")
+            .execute()
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        ) from e
+
+    return res.data
