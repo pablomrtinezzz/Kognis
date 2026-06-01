@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/store/AuthContext";
 import { apiDelete, apiGet, apiPost, apiUpload } from "@/lib/apiClient";
+import { db } from "@/lib/db";
 
 export interface DocumentItem {
   id: string;
@@ -53,7 +54,7 @@ export function useDocuments() {
   }, [session, fetchDocuments]);
 
   const uploadAndProcess = useCallback(
-    async (file: File) => {
+    async (file: File, folderId?: string) => {
       const active = uploadState.stage;
       if (active === "uploading" || active === "processing") return;
 
@@ -74,6 +75,13 @@ export function useDocuments() {
           message: "Upload failed. Try again.",
         });
         return;
+      }
+
+      if (folderId) {
+        await db.folder_assignments.put({
+          doc_id: uploaded.id,
+          folder_id: folderId,
+        });
       }
 
       setUploadState({

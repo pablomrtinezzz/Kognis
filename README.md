@@ -9,6 +9,7 @@
     <img src="https://img.shields.io/badge/FastAPI-Python-009688?style=flat-square&logo=fastapi" alt="FastAPI" />
     <img src="https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=flat-square&logo=supabase" alt="Supabase" />
     <img src="https://img.shields.io/badge/Dexie.js-Offline_First-F15F22?style=flat-square" alt="Dexie.js" />
+    <img src="https://img.shields.io/badge/Gemini-AI_Pipeline-4285F4?style=flat-square&logo=google" alt="Gemini AI" />
   </p>
 </div>
 
@@ -88,7 +89,9 @@ The project operates through two decoupled but highly synchronized modules:
 
 ### Backend (FastAPI Analytics Engine)
 
-The backend is responsible for data persistence, authentication validation via Supabase RLS, and executing complex Pandas-based analytics (EWMA) for overload prediction.
+The backend is responsible for data persistence, authentication validation via Supabase RLS, executing complex Pandas-based analytics (EWMA) for overload prediction, and AI-powered document processing via the Gemini API. A background APScheduler task evaluates daily streaks on a cron schedule.
+
+**Key dependencies**: `fastapi`, `uvicorn`, `supabase`, `pandas`, `PyMuPDF`, `google-genai`, `apscheduler`, `pydantic-settings`
 
 ```bash
 cd backend
@@ -132,7 +135,9 @@ The frontend captures sets, reps, and weights directly into Dexie.js. This guara
 A custom hook (`useSyncManager`) acts as an event broker. It reads pending mutations from IndexedDB, checks network availability, and pushes updates to the FastAPI backend asynchronously.
 3. **Analytics Engine (Python/Pandas)**:
 The backend queries historical data, calculates the daily 1RM using the Epley formula, applies an Exponentially Weighted Moving Average (EWMA), and returns precise load suggestions.
-4. **Data Visualization (Recharts & SVG)**:
+4. **Cognitive Module (Gemini AI)**:
+PDF documents are extracted via PyMuPDF, chunked, and processed through the Gemini API (`google-genai`) to generate structured insights. A background APScheduler job evaluates daily streaks without blocking request handling.
+5. **Data Visualization (Recharts & SVG)**:
 The frontend consumes the analytics to render a multi-spoke Radar Chart and a dynamic SVG Heatmap representing weekly training volume per muscle group.
 
 ### Data Flow
@@ -161,7 +166,8 @@ The frontend consumes the analytics to render a multi-spoke Radar Chart and a dy
 | 1 | Supabase configuration, RLS schemas, and Base Auth | ✅ Done |
 | 2 | Dexie.js Integration, SyncManager, and Routine UI | ✅ Done |
 | 3 | Analytics Engine (EWMA), Radar Charts & SVG Muscle Heatmap | ✅ Done |
-| 4 | User Profiles, Production OAuth (Google), and Global Alerts | ⏳ Pending |
+| 4 | Cognitive Module: PDF ingestion + Gemini AI pipeline, streak scheduler | ✅ Done |
+| 5 | User Profiles, Production OAuth (Google), and Global Alerts | ⏳ Pending |
 
 ---
 

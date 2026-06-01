@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle, Minus, Plus } from "lucide-react";
 import { useWorkoutTemplates } from "@/hooks/useWorkoutTemplates";
+import { db } from "@/lib/db";
 import { EXERCISE_CATALOG } from "../../_workout-form";
 import type { ExerciseBlock } from "@/lib/db";
 
@@ -313,6 +314,7 @@ function ExerciseRow({
 
 export default function NewTemplatePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { createTemplate } = useWorkoutTemplates();
 
   const [name, setName] = useState("");
@@ -321,6 +323,49 @@ export default function NewTemplatePage() {
   ]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Pre-fill from an existing Dexie template (?clone=<id>)
+  // or from a catalog entry (?catalog=<json>)
+  useEffect(() => {
+    const cloneId = searchParams.get("clone");
+    const catalogJson = searchParams.get("catalog");
+
+    if (cloneId) {
+      (async () => {
+        const source = await db.workout_templates.get(cloneId);
+        if (!source) return;
+        setName(`${source.name} (copia)`);
+        setExercises(
+          source.exercises.map((e) => ({
+            id: crypto.randomUUID(),
+            name: e.name,
+            sets: e.sets ?? 3,
+            reps: e.reps ?? 10,
+            block: (e.block as ExerciseBlock) ?? "main",
+          })),
+        );
+      })();
+    } else if (catalogJson) {
+      try {
+        const catalog = JSON.parse(catalogJson) as {
+          name: string;
+          exercises: { name: string; sets: number; reps: number }[];
+        };
+        setName(catalog.name);
+        setExercises(
+          catalog.exercises.map((e) => ({
+            id: crypto.randomUUID(),
+            name: e.name,
+            sets: e.sets,
+            reps: e.reps,
+            block: "main" as ExerciseBlock,
+          })),
+        );
+      } catch {
+        // ignore malformed param
+      }
+    }
+  }, [searchParams]);
 
   const updateExercise = (id: string, updated: TemplateExerciseDraft) =>
     setExercises((prev) => prev.map((e) => (e.id === id ? updated : e)));

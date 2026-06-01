@@ -2,17 +2,21 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ChevronDown,
   ChevronUp,
   Clock,
   Dumbbell,
   ListOrdered,
+  Pencil,
   RefreshCw,
+  Trash2,
   TrendingUp,
   WifiOff,
   Zap,
 } from "lucide-react";
+import { useAuth } from "@/store/AuthContext";
 import {
   CartesianGrid,
   Line,
@@ -158,15 +162,19 @@ function WorkoutDetail({ localId }: { localId: string }) {
 function WorkoutRow({
   workout,
   onRetry,
+  onDelete,
 }: {
   workout: LocalWorkout;
   onRetry: (id: string) => void;
+  onDelete: (localId: string) => void;
 }) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const duration = formatDuration(workout.started_at, workout.finished_at);
 
   return (
-    <GlassPanel className="flex flex-col gap-0 p-0 overflow-hidden">
+    <GlassPanel className="flex flex-col gap-0 p-0 overflow-hidden group">
       <div
         className="flex items-center gap-4 p-4 cursor-pointer"
         onClick={() => setExpanded((v) => !v)}
@@ -230,6 +238,53 @@ function WorkoutRow({
           />
         )}
 
+        {/* ── Edit / Delete ── */}
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-200 shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/workouts/edit/${workout.local_id}`);
+            }}
+            className="p-1.5 rounded-xl text-white/20 hover:text-white/70 hover:bg-white/[0.06] transition-all duration-200"
+            aria-label="Editar entreno"
+          >
+            <Pencil size={11} />
+          </button>
+          {deleteConfirm ? (
+            <div
+              className="flex items-center gap-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => {
+                  onDelete(workout.local_id);
+                  setDeleteConfirm(false);
+                }}
+                className="text-[10px] font-bold text-red-400 px-2 py-0.5 rounded-lg hover:bg-red-400/[0.08] transition-colors"
+              >
+                Borrar
+              </button>
+              <button
+                onClick={() => setDeleteConfirm(false)}
+                className="text-[10px] text-white/30 px-1.5 py-0.5 rounded-lg transition-colors"
+              >
+                No
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteConfirm(true);
+              }}
+              className="p-1.5 rounded-xl text-white/15 hover:text-red-400 hover:bg-red-400/[0.07] transition-all duration-200"
+              aria-label="Eliminar entreno"
+            >
+              <Trash2 size={11} />
+            </button>
+          )}
+        </div>
+
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -255,11 +310,50 @@ function WorkoutRow({
 
 function HistorialTab() {
   const { workouts, loading, isOffline, refresh } = useWorkouts();
+  const { session } = useAuth();
   const toast = useToast();
 
   const handleRetry = async (_localId: string) => {
     await refresh();
     toast("Reintentando sincronización…", "info");
+  };
+
+  const handleDelete = async (localId: string) => {
+    try {
+      const exs = await db.workout_exercises
+        .where("workout_local_id")
+        .equals(localId)
+        .toArray();
+      for (const ex of exs) {
+        await db.sets
+          .where("workout_exercise_local_id")
+          .equals(ex.local_id)
+          .delete();
+      }
+      await db.workout_exercises
+        .where("workout_local_id")
+        .equals(localId)
+        .delete();
+      await db.workouts.delete(localId);
+
+      // Best-effort server delete
+      try {
+        const token = session?.access_token;
+        if (token) {
+          await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/v1/workouts/${localId}`,
+            { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+          );
+        }
+      } catch {
+        // ignore — local delete already done
+      }
+
+      await refresh();
+      toast("Entreno eliminado", "success");
+    } catch {
+      toast("No se pudo eliminar el entreno", "error");
+    }
   };
 
   if (loading) {
@@ -320,7 +414,12 @@ function HistorialTab() {
         </div>
       )}
       {workouts.map((w) => (
-        <WorkoutRow key={w.local_id} workout={w} onRetry={handleRetry} />
+        <WorkoutRow
+          key={w.local_id}
+          workout={w}
+          onRetry={handleRetry}
+          onDelete={handleDelete}
+        />
       ))}
     </div>
   );

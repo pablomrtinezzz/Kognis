@@ -20,7 +20,7 @@ export interface SessionStats {
   total: number;
 }
 
-export function useStudySession(documentId?: string) {
+export function useStudySession(documentId?: string, all = false) {
   const { session } = useAuth();
   const token = session?.access_token;
 
@@ -37,10 +37,13 @@ export function useStudySession(documentId?: string) {
 
   const fetchDue = useCallback(async () => {
     setLoading(true);
+    setCurrentIndex(0);
     try {
-      const path = documentId
-        ? `/api/v1/flashcards/due?document_id=${documentId}`
-        : "/api/v1/flashcards/due";
+      const params = new URLSearchParams();
+      if (documentId) params.set("document_id", documentId);
+      if (all) params.set("all", "true");
+      const qs = params.toString();
+      const path = `/api/v1/flashcards/due${qs ? `?${qs}` : ""}`;
       const cards = await apiGet<DueCard[]>(path, token);
       setQueue(cards);
       setStats({ correct: 0, incorrect: 0, skipped: 0, total: cards.length });
@@ -49,7 +52,7 @@ export function useStudySession(documentId?: string) {
     } finally {
       setLoading(false);
     }
-  }, [token, documentId]);
+  }, [token, documentId, all]);
 
   useEffect(() => {
     if (session) fetchDue();
@@ -118,5 +121,6 @@ export function useStudySession(documentId?: string) {
     skipCard,
     deleteCard,
     editCard,
+    restart: fetchDue,
   };
 }

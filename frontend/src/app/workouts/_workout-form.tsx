@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Plus, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { EXERCISE_CATALOG, ALL_EXERCISES } from "@/lib/exercises";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import type { ExerciseBlock } from "@/lib/db";
@@ -14,6 +21,7 @@ export interface DraftSet {
   localId: string;
   reps: string;
   weightKg: string;
+  checked?: boolean;
 }
 
 export interface DraftExercise {
@@ -74,15 +82,27 @@ interface ExerciseComboboxProps {
   value: string;
   onChange: (value: string) => void;
   autoFocus?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function ExerciseCombobox({
   value,
   onChange,
   autoFocus,
+  onOpenChange,
 }: ExerciseComboboxProps) {
   const [open, setOpen] = useState(false);
   const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null);
+
+  const openDropdown = () => {
+    setOpen(true);
+    onOpenChange?.(true);
+  };
+  const closeDropdown = () => {
+    setOpen(false);
+    setSelectedMuscle(null);
+    onOpenChange?.(false);
+  };
 
   const isSearching = value.trim().length > 0;
 
@@ -106,7 +126,7 @@ export function ExerciseCombobox({
 
   const selectExercise = (name: string) => {
     onChange(name);
-    setOpen(false);
+    closeDropdown();
   };
 
   const DROPDOWN_STYLE: React.CSSProperties = {
@@ -139,20 +159,18 @@ export function ExerciseCombobox({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setOpen(true)}
-        onBlur={() =>
-          setTimeout(() => {
-            setOpen(false);
-            setSelectedMuscle(null);
-          }, 150)
-        }
+        onFocus={openDropdown}
+        onBlur={() => setTimeout(closeDropdown, 200)}
         placeholder="Exercise"
         autoFocus={autoFocus}
         className="w-full bg-transparent text-sm font-semibold text-white/90 placeholder-white/20 focus:outline-none"
       />
 
       {open && (
-        <div style={DROPDOWN_STYLE}>
+        // onPointerDown with preventDefault keeps the input focused on
+        // both desktop (mouse) and mobile (touch) — the only unified
+        // pointer API that reliably blocks blur on all platforms.
+        <div style={DROPDOWN_STYLE} onPointerDown={(e) => e.preventDefault()}>
           {isSearching ? (
             <div className="max-h-72 overflow-y-auto overscroll-contain">
               {Object.keys(searchGrouped).length > 0 ? (
@@ -168,7 +186,7 @@ export function ExerciseCombobox({
                       <button
                         key={name}
                         type="button"
-                        onMouseDown={() => selectExercise(name)}
+                        onClick={() => selectExercise(name)}
                         className="w-full text-left px-4 py-2.5 text-sm transition-all duration-200"
                         style={
                           value === name
@@ -211,10 +229,7 @@ export function ExerciseCombobox({
               <div style={STICKY_HEADER_STYLE}>
                 <button
                   type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    setSelectedMuscle(null);
-                  }}
+                  onClick={() => setSelectedMuscle(null)}
                   className="flex items-center gap-2 w-full px-4 py-3 text-xs transition-all duration-200"
                   style={{ color: "rgba(255,255,255,0.40)" }}
                 >
@@ -232,7 +247,7 @@ export function ExerciseCombobox({
                   <button
                     key={name}
                     type="button"
-                    onMouseDown={() => selectExercise(name)}
+                    onClick={() => selectExercise(name)}
                     className="w-full text-left px-4 py-2.5 text-sm transition-all duration-200"
                     style={
                       value === name
@@ -274,10 +289,7 @@ export function ExerciseCombobox({
                   <button
                     key={muscle}
                     type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      setSelectedMuscle(muscle);
-                    }}
+                    onClick={() => setSelectedMuscle(muscle)}
                     className="text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200"
                     style={{ color: "rgba(255,255,255,0.55)" }}
                     onMouseEnter={(e) => {
@@ -314,6 +326,10 @@ interface ExerciseCardProps {
   exIdx: number;
   isOnly: boolean;
   isLast: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
   onRemoveExercise: () => void;
   onUpdateName: (name: string) => void;
   onUpdateBlock: (block: ExerciseBlock) => void;
@@ -325,6 +341,7 @@ interface ExerciseCardProps {
     field: "reps" | "weightKg",
     value: string,
   ) => void;
+  onCheckSet?: (setIdx: number) => void;
 }
 
 export function ExerciseCard({
@@ -332,6 +349,10 @@ export function ExerciseCard({
   exIdx,
   isOnly,
   isLast,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
   onRemoveExercise,
   onUpdateName,
   onUpdateBlock,
@@ -339,47 +360,133 @@ export function ExerciseCard({
   onCopySet,
   onRemoveSet,
   onUpdateSet,
+  onCheckSet,
 }: ExerciseCardProps) {
+  const [comboOpen, setComboOpen] = useState(false);
+
+  const doneCount = ex.sets.filter((s) => s.checked).length;
+  const allDone = ex.sets.length > 0 && doneCount === ex.sets.length;
+
   return (
-    <GlassPanel style={{ overflow: "visible", borderRadius: "1.5rem" }}>
+    <GlassPanel
+      style={{
+        overflow: "visible",
+        borderRadius: "1.5rem",
+        // Elevate card above subsequent cards when its dropdown is open.
+        // backdrop-filter on GlassPanel creates a stacking context, so
+        // z-index here controls ordering relative to other cards.
+        ...(comboOpen ? { position: "relative", zIndex: 20 } : {}),
+      }}
+    >
       {/* Exercise name row */}
       <div
         className="flex items-center gap-3 px-5 py-4"
         style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
       >
-        <span
-          className="text-[10px] font-bold uppercase tracking-[0.12em] tabular-nums shrink-0 w-4 text-center"
-          style={{ color: "rgba(255,255,255,0.20)" }}
+        <div
+          className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full transition-all duration-300"
+          style={
+            onCheckSet && allDone
+              ? {
+                  backgroundColor: "rgba(16,185,129,0.15)",
+                  border: "1.5px solid rgba(16,185,129,0.5)",
+                }
+              : onCheckSet && doneCount > 0
+                ? {
+                    backgroundColor: "rgba(37,119,255,0.10)",
+                    border: "1.5px solid rgba(37,119,255,0.25)",
+                  }
+                : {}
+          }
         >
-          {exIdx + 1}
-        </span>
+          {onCheckSet && allDone ? (
+            <Check
+              size={11}
+              strokeWidth={3}
+              style={{ color: "rgb(16,185,129)" }}
+            />
+          ) : (
+            <span
+              className="text-[10px] font-bold uppercase tracking-[0.12em] tabular-nums"
+              style={{
+                color:
+                  onCheckSet && doneCount > 0
+                    ? "rgba(37,119,255,0.70)"
+                    : "rgba(255,255,255,0.20)",
+              }}
+            >
+              {exIdx + 1}
+            </span>
+          )}
+        </div>
         <ExerciseCombobox
           value={ex.name}
           onChange={onUpdateName}
           autoFocus={isLast && ex.name === ""}
+          onOpenChange={setComboOpen}
         />
-        {!isOnly && (
+
+        {/* ── Reorder + remove ── */}
+        <div className="flex items-center gap-0.5 shrink-0">
           <button
-            onClick={onRemoveExercise}
-            className="transition-all duration-300 ease-out p-1.5 rounded-xl active:scale-90 shrink-0"
-            style={{ color: "rgba(255,255,255,0.15)" }}
+            onClick={onMoveUp}
+            disabled={!canMoveUp}
+            className="p-1 rounded-lg transition-all duration-200 active:scale-90 disabled:opacity-0"
+            style={{ color: "rgba(255,255,255,0.20)" }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color =
-                "rgb(248,113,113)";
-              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                "rgba(248,113,113,0.08)";
+              if (canMoveUp)
+                (e.currentTarget as HTMLButtonElement).style.color =
+                  "rgba(255,255,255,0.70)";
             }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLButtonElement).style.color =
-                "rgba(255,255,255,0.15)";
-              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                "transparent";
+                "rgba(255,255,255,0.20)";
             }}
-            aria-label="Remove exercise"
+            aria-label="Mover arriba"
           >
-            <Trash2 size={14} />
+            <ChevronUp size={14} strokeWidth={2.5} />
           </button>
-        )}
+          <button
+            onClick={onMoveDown}
+            disabled={!canMoveDown}
+            className="p-1 rounded-lg transition-all duration-200 active:scale-90 disabled:opacity-0"
+            style={{ color: "rgba(255,255,255,0.20)" }}
+            onMouseEnter={(e) => {
+              if (canMoveDown)
+                (e.currentTarget as HTMLButtonElement).style.color =
+                  "rgba(255,255,255,0.70)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.color =
+                "rgba(255,255,255,0.20)";
+            }}
+            aria-label="Mover abajo"
+          >
+            <ChevronDown size={14} strokeWidth={2.5} />
+          </button>
+          {!isOnly && (
+            <button
+              onClick={onRemoveExercise}
+              className="p-1.5 rounded-xl transition-all duration-200 active:scale-90 ml-0.5"
+              style={{ color: "rgba(255,255,255,0.15)" }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.color =
+                  "rgb(248,113,113)";
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                  "rgba(248,113,113,0.08)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.color =
+                  "rgba(255,255,255,0.15)";
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                  "transparent";
+              }}
+              aria-label="Eliminar ejercicio"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Block selector */}
@@ -416,130 +523,187 @@ export function ExerciseCard({
         })}
       </div>
 
-      {/* Column headers */}
-      <div className="grid grid-cols-[1.75rem_1fr_1fr_1.75rem_1.75rem] gap-2 px-5 pt-4 pb-1.5">
-        <span
-          className="text-[9px] text-center font-bold uppercase tracking-[0.1em]"
-          style={{ color: "rgba(255,255,255,0.20)" }}
-        >
-          #
-        </span>
-        <span
-          className="text-[9px] font-bold uppercase tracking-[0.1em]"
-          style={{ color: "rgba(255,255,255,0.20)" }}
-        >
-          Reps
-        </span>
-        <span
-          className="text-[9px] font-bold uppercase tracking-[0.1em]"
-          style={{ color: "rgba(255,255,255,0.20)" }}
-        >
-          Weight kg
-        </span>
-        <span />
-        <span />
-      </div>
+      {/* Column headers — warmup/cooldown hides weight */}
+      {(() => {
+        const isTimed = ex.block === "warmup" || ex.block === "cooldown";
+        const gridCols = isTimed
+          ? "grid-cols-[1.75rem_1fr_1.75rem_1.75rem]"
+          : "grid-cols-[1.75rem_1fr_1fr_1.75rem_1.75rem]";
+        return (
+          <>
+            <div className={`grid ${gridCols} gap-2 px-5 pt-4 pb-1.5`}>
+              <span
+                className="text-[9px] text-center font-bold uppercase tracking-[0.1em]"
+                style={{ color: "rgba(255,255,255,0.20)" }}
+              >
+                {onCheckSet ? "✓" : "#"}
+              </span>
+              <span
+                className="text-[9px] font-bold uppercase tracking-[0.1em]"
+                style={{ color: "rgba(255,255,255,0.20)" }}
+              >
+                {isTimed ? "Reps / seg" : "Reps"}
+              </span>
+              {!isTimed && (
+                <span
+                  className="text-[9px] font-bold uppercase tracking-[0.1em]"
+                  style={{ color: "rgba(255,255,255,0.20)" }}
+                >
+                  Peso kg
+                </span>
+              )}
+              <span />
+              <span />
+            </div>
 
-      {/* Set rows */}
-      <div className="px-5 pb-4 space-y-2">
-        {ex.sets.map((s, setIdx) => (
-          <div
-            key={s.localId}
-            className="grid grid-cols-[1.75rem_1fr_1fr_1.75rem_1.75rem] gap-2 items-center"
-          >
-            <span
-              className="text-xs text-center font-semibold tabular-nums"
-              style={{ color: "rgba(255,255,255,0.25)" }}
-            >
-              {setIdx + 1}
-            </span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min="0"
-              value={s.reps}
-              onChange={(e) => onUpdateSet(setIdx, "reps", e.target.value)}
-              placeholder="—"
-              className="w-full h-10 rounded-xl text-sm text-center font-semibold tabular-nums focus:outline-none transition-all duration-300 placeholder:text-white/15"
-              style={{
-                backgroundColor: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.07)",
-                color: "rgba(255,255,255,0.80)",
-              }}
-              onFocus={(e) => {
-                (e.currentTarget as HTMLInputElement).style.borderColor =
-                  "rgba(37,119,255,0.45)";
-                (e.currentTarget as HTMLInputElement).style.boxShadow =
-                  "0 0 0 3px rgba(37,119,255,0.10)";
-              }}
-              onBlur={(e) => {
-                (e.currentTarget as HTMLInputElement).style.borderColor =
-                  "rgba(255,255,255,0.07)";
-                (e.currentTarget as HTMLInputElement).style.boxShadow = "none";
-              }}
-            />
-            <input
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="0.5"
-              value={s.weightKg}
-              onChange={(e) => onUpdateSet(setIdx, "weightKg", e.target.value)}
-              placeholder="—"
-              className="w-full h-10 rounded-xl text-sm text-center font-semibold tabular-nums focus:outline-none transition-all duration-300 placeholder:text-white/15"
-              style={{
-                backgroundColor: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.07)",
-                color: "rgba(255,255,255,0.80)",
-              }}
-              onFocus={(e) => {
-                (e.currentTarget as HTMLInputElement).style.borderColor =
-                  "rgba(37,119,255,0.45)";
-                (e.currentTarget as HTMLInputElement).style.boxShadow =
-                  "0 0 0 3px rgba(37,119,255,0.10)";
-              }}
-              onBlur={(e) => {
-                (e.currentTarget as HTMLInputElement).style.borderColor =
-                  "rgba(255,255,255,0.07)";
-                (e.currentTarget as HTMLInputElement).style.boxShadow = "none";
-              }}
-            />
-            <button
-              onClick={() => onCopySet(setIdx)}
-              className="flex items-center justify-center transition-all duration-300 ease-out active:scale-90"
-              style={{ color: "rgba(255,255,255,0.15)" }}
-              onMouseEnter={(e) =>
-                ((e.currentTarget as HTMLButtonElement).style.color =
-                  "rgb(16,185,129)")
-              }
-              onMouseLeave={(e) =>
-                ((e.currentTarget as HTMLButtonElement).style.color =
-                  "rgba(255,255,255,0.15)")
-              }
-              aria-label="Duplicate set"
-            >
-              <Copy size={13} />
-            </button>
-            <button
-              onClick={() => onRemoveSet(setIdx)}
-              disabled={ex.sets.length === 1}
-              className="flex items-center justify-center transition-all duration-300 ease-out disabled:pointer-events-none disabled:opacity-0 active:scale-90"
-              style={{ color: "rgba(255,255,255,0.15)" }}
-              onMouseEnter={(e) =>
-                ((e.currentTarget as HTMLButtonElement).style.color =
-                  "rgb(248,113,113)")
-              }
-              onMouseLeave={(e) =>
-                ((e.currentTarget as HTMLButtonElement).style.color =
-                  "rgba(255,255,255,0.15)")
-              }
-              aria-label="Remove set"
-            >
-              <Trash2 size={13} />
-            </button>
-          </div>
-        ))}
-      </div>
+            <div className="px-5 pb-4 space-y-2">
+              {ex.sets.map((s, setIdx) => (
+                <div
+                  key={s.localId}
+                  className={`grid ${gridCols} gap-2 items-center transition-opacity duration-200`}
+                  style={{ opacity: s.checked ? 0.45 : 1 }}
+                >
+                  {/* Set number / tick button */}
+                  {onCheckSet ? (
+                    <button
+                      onClick={() => onCheckSet(setIdx)}
+                      className="flex items-center justify-center w-7 h-7 rounded-full transition-all duration-200 active:scale-90"
+                      style={
+                        s.checked
+                          ? {
+                              backgroundColor: "rgba(16,185,129,0.15)",
+                              border: "1.5px solid rgba(16,185,129,0.60)",
+                            }
+                          : {
+                              backgroundColor: "rgba(255,255,255,0.04)",
+                              border: "1.5px solid rgba(255,255,255,0.12)",
+                            }
+                      }
+                      aria-label={s.checked ? "Desmarcar" : "Marcar serie"}
+                    >
+                      {s.checked ? (
+                        <Check
+                          size={11}
+                          strokeWidth={3}
+                          style={{ color: "rgb(16,185,129)" }}
+                        />
+                      ) : (
+                        <span
+                          className="text-[10px] font-bold tabular-nums"
+                          style={{ color: "rgba(255,255,255,0.30)" }}
+                        >
+                          {setIdx + 1}
+                        </span>
+                      )}
+                    </button>
+                  ) : (
+                    <span
+                      className="text-xs text-center font-semibold tabular-nums"
+                      style={{ color: "rgba(255,255,255,0.25)" }}
+                    >
+                      {setIdx + 1}
+                    </span>
+                  )}
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    value={s.reps}
+                    onChange={(e) =>
+                      onUpdateSet(setIdx, "reps", e.target.value)
+                    }
+                    placeholder="—"
+                    className="w-full h-10 rounded-xl text-sm text-center font-semibold tabular-nums focus:outline-none transition-all duration-300 placeholder:text-white/15"
+                    style={{
+                      backgroundColor: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                      color: "rgba(255,255,255,0.80)",
+                    }}
+                    onFocus={(e) => {
+                      (e.currentTarget as HTMLInputElement).style.borderColor =
+                        "rgba(37,119,255,0.45)";
+                      (e.currentTarget as HTMLInputElement).style.boxShadow =
+                        "0 0 0 3px rgba(37,119,255,0.10)";
+                    }}
+                    onBlur={(e) => {
+                      (e.currentTarget as HTMLInputElement).style.borderColor =
+                        "rgba(255,255,255,0.07)";
+                      (e.currentTarget as HTMLInputElement).style.boxShadow =
+                        "none";
+                    }}
+                  />
+                  {!isTimed && (
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.5"
+                      value={s.weightKg}
+                      onChange={(e) =>
+                        onUpdateSet(setIdx, "weightKg", e.target.value)
+                      }
+                      placeholder="—"
+                      className="w-full h-10 rounded-xl text-sm text-center font-semibold tabular-nums focus:outline-none transition-all duration-300 placeholder:text-white/15"
+                      style={{
+                        backgroundColor: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.07)",
+                        color: "rgba(255,255,255,0.80)",
+                      }}
+                      onFocus={(e) => {
+                        (
+                          e.currentTarget as HTMLInputElement
+                        ).style.borderColor = "rgba(37,119,255,0.45)";
+                        (e.currentTarget as HTMLInputElement).style.boxShadow =
+                          "0 0 0 3px rgba(37,119,255,0.10)";
+                      }}
+                      onBlur={(e) => {
+                        (
+                          e.currentTarget as HTMLInputElement
+                        ).style.borderColor = "rgba(255,255,255,0.07)";
+                        (e.currentTarget as HTMLInputElement).style.boxShadow =
+                          "none";
+                      }}
+                    />
+                  )}
+                  <button
+                    onClick={() => onCopySet(setIdx)}
+                    className="flex items-center justify-center transition-all duration-300 ease-out active:scale-90"
+                    style={{ color: "rgba(255,255,255,0.15)" }}
+                    onMouseEnter={(e) =>
+                      ((e.currentTarget as HTMLButtonElement).style.color =
+                        "rgb(16,185,129)")
+                    }
+                    onMouseLeave={(e) =>
+                      ((e.currentTarget as HTMLButtonElement).style.color =
+                        "rgba(255,255,255,0.15)")
+                    }
+                    aria-label="Duplicate set"
+                  >
+                    <Copy size={13} />
+                  </button>
+                  <button
+                    onClick={() => onRemoveSet(setIdx)}
+                    disabled={ex.sets.length === 1}
+                    className="flex items-center justify-center transition-all duration-300 ease-out disabled:pointer-events-none disabled:opacity-0 active:scale-90"
+                    style={{ color: "rgba(255,255,255,0.15)" }}
+                    onMouseEnter={(e) =>
+                      ((e.currentTarget as HTMLButtonElement).style.color =
+                        "rgb(248,113,113)")
+                    }
+                    onMouseLeave={(e) =>
+                      ((e.currentTarget as HTMLButtonElement).style.color =
+                        "rgba(255,255,255,0.15)")
+                    }
+                    aria-label="Remove set"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      })()}
 
       {/* Add set */}
       <button
@@ -574,6 +738,22 @@ export function useExerciseActions(
   setExercises: React.Dispatch<React.SetStateAction<DraftExercise[]>>,
 ) {
   const addExercise = () => setExercises((prev) => [...prev, newExercise()]);
+
+  const insertExercise = (atIndex: number) =>
+    setExercises((prev) => [
+      ...prev.slice(0, atIndex),
+      newExercise(),
+      ...prev.slice(atIndex),
+    ]);
+
+  const moveExercise = (exIdx: number, direction: "up" | "down") =>
+    setExercises((prev) => {
+      const next = [...prev];
+      const target = direction === "up" ? exIdx - 1 : exIdx + 1;
+      if (target < 0 || target >= next.length) return prev;
+      [next[exIdx], next[target]] = [next[target], next[exIdx]];
+      return next;
+    });
 
   const removeExercise = (exIdx: number) =>
     setExercises((prev) => prev.filter((_, i) => i !== exIdx));
@@ -639,8 +819,24 @@ export function useExerciseActions(
       ),
     );
 
+  const checkSet = (exIdx: number, setIdx: number) =>
+    setExercises((prev) =>
+      prev.map((ex, i) =>
+        i === exIdx
+          ? {
+              ...ex,
+              sets: ex.sets.map((s, j) =>
+                j === setIdx ? { ...s, checked: !s.checked } : s,
+              ),
+            }
+          : ex,
+      ),
+    );
+
   return {
     addExercise,
+    insertExercise,
+    moveExercise,
     removeExercise,
     updateExerciseName,
     updateExerciseBlock,
@@ -648,6 +844,7 @@ export function useExerciseActions(
     copySet,
     removeSet,
     updateSet,
+    checkSet,
   };
 }
 
@@ -656,23 +853,53 @@ export function useExerciseActions(
 interface ExerciseListProps {
   exercises: DraftExercise[];
   actions: ReturnType<typeof useExerciseActions>;
+  showChecks?: boolean;
 }
 
-export function ExerciseList({ exercises, actions }: ExerciseListProps) {
+function InsertExerciseButton({ onInsert }: { onInsert: () => void }) {
   return (
-    <div className="flex flex-col">
-      {/* Scrollable exercise cards — scrollbars hidden via globals.css */}
+    <button
+      onClick={onInsert}
+      className="w-full flex items-center gap-2 py-1 group/ins active:scale-[0.98] transition-all duration-150"
+      aria-label="Insertar ejercicio aquí"
+    >
       <div
-        className="overflow-y-auto overscroll-contain space-y-3"
-        style={{ scrollbarWidth: "none" }}
+        className="flex-1 h-px transition-colors duration-200"
+        style={{ backgroundColor: "rgba(255,255,255,0.05)" }}
+      />
+      <span
+        className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition-colors duration-200"
+        style={{ color: "rgba(255,255,255,0.18)" }}
       >
-        {exercises.map((ex, exIdx) => (
+        <Plus size={9} strokeWidth={3} />
+        ejercicio aquí
+      </span>
+      <div
+        className="flex-1 h-px transition-colors duration-200"
+        style={{ backgroundColor: "rgba(255,255,255,0.05)" }}
+      />
+    </button>
+  );
+}
+
+export function ExerciseList({
+  exercises,
+  actions,
+  showChecks,
+}: ExerciseListProps) {
+  return (
+    <div className="flex flex-col gap-0">
+      {exercises.map((ex, exIdx) => (
+        <div key={ex.localId} className="flex flex-col gap-0">
           <ExerciseCard
-            key={ex.localId}
             ex={ex}
             exIdx={exIdx}
             isOnly={exercises.length === 1}
             isLast={exIdx === exercises.length - 1}
+            canMoveUp={exIdx > 0}
+            canMoveDown={exIdx < exercises.length - 1}
+            onMoveUp={() => actions.moveExercise(exIdx, "up")}
+            onMoveDown={() => actions.moveExercise(exIdx, "down")}
             onRemoveExercise={() => actions.removeExercise(exIdx)}
             onUpdateName={(name) => actions.updateExerciseName(exIdx, name)}
             onUpdateBlock={(block) => actions.updateExerciseBlock(exIdx, block)}
@@ -682,37 +909,17 @@ export function ExerciseList({ exercises, actions }: ExerciseListProps) {
             onUpdateSet={(setIdx, field, value) =>
               actions.updateSet(exIdx, setIdx, field, value)
             }
+            onCheckSet={
+              showChecks
+                ? (setIdx) => actions.checkSet(exIdx, setIdx)
+                : undefined
+            }
           />
-        ))}
-      </div>
-
-      <button
-        onClick={actions.addExercise}
-        className="mt-3 w-full py-4 rounded-3xl border border-dashed flex items-center justify-center gap-2 text-sm font-semibold transition-all duration-300 ease-out active:scale-[0.98]"
-        style={{
-          borderColor: "rgba(255,255,255,0.07)",
-          color: "rgba(255,255,255,0.25)",
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.borderColor =
-            "rgba(37,119,255,0.30)";
-          (e.currentTarget as HTMLButtonElement).style.color =
-            "rgba(37,119,255,0.70)";
-          (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-            "rgba(37,119,255,0.03)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.borderColor =
-            "rgba(255,255,255,0.07)";
-          (e.currentTarget as HTMLButtonElement).style.color =
-            "rgba(255,255,255,0.25)";
-          (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-            "transparent";
-        }}
-      >
-        <Plus size={15} strokeWidth={2.5} />
-        Add exercise
-      </button>
+          <InsertExerciseButton
+            onInsert={() => actions.insertExercise(exIdx + 1)}
+          />
+        </div>
+      ))}
     </div>
   );
 }

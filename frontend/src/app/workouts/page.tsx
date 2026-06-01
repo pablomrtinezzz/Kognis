@@ -3,10 +3,88 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Dumbbell, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { Dumbbell, Layers, Pencil, Play, Plus, Trash2, X } from "lucide-react";
 import { useWorkoutTemplates } from "@/hooks/useWorkoutTemplates";
 import type { LocalWorkoutTemplate } from "@/lib/db";
 import { GlassPanel } from "@/components/ui/GlassPanel";
+
+// ─── Predefined template catalog (never saved to Dexie) ──────────────────────
+
+const TEMPLATE_CATALOG: {
+  name: string;
+  exercises: { name: string; sets: number; reps: number }[];
+}[] = [
+  {
+    name: "Push — Empuje",
+    exercises: [
+      { name: "Press banca", sets: 4, reps: 8 },
+      { name: "Press banca inclinado", sets: 3, reps: 10 },
+      { name: "Press militar con mancuernas", sets: 3, reps: 12 },
+      { name: "Elevaciones laterales", sets: 3, reps: 15 },
+      { name: "Extensión en polea alta (cuerda)", sets: 3, reps: 12 },
+    ],
+  },
+  {
+    name: "Pull — Tirón",
+    exercises: [
+      { name: "Dominadas (prono)", sets: 4, reps: 8 },
+      { name: "Remo con barra", sets: 4, reps: 8 },
+      { name: "Jalón al pecho", sets: 3, reps: 10 },
+      { name: "Curl con barra EZ", sets: 3, reps: 12 },
+      { name: "Curl martillo", sets: 3, reps: 12 },
+    ],
+  },
+  {
+    name: "Legs — Pierna",
+    exercises: [
+      { name: "Sentadilla libre", sets: 4, reps: 8 },
+      { name: "Prensa de piernas", sets: 3, reps: 10 },
+      { name: "Peso muerto rumano", sets: 3, reps: 10 },
+      { name: "Curl de femoral tumbado", sets: 3, reps: 12 },
+      { name: "Pantorrillas de pie", sets: 4, reps: 15 },
+    ],
+  },
+  {
+    name: "Full Body",
+    exercises: [
+      { name: "Sentadilla libre", sets: 3, reps: 8 },
+      { name: "Press banca", sets: 3, reps: 8 },
+      { name: "Peso muerto convencional", sets: 3, reps: 6 },
+      { name: "Press militar con barra", sets: 3, reps: 10 },
+      { name: "Remo con barra", sets: 3, reps: 8 },
+    ],
+  },
+  {
+    name: "Arnold — Pecho & Espalda",
+    exercises: [
+      { name: "Press banca", sets: 4, reps: 8 },
+      { name: "Aperturas con mancuernas", sets: 3, reps: 12 },
+      { name: "Dominadas (prono)", sets: 4, reps: 8 },
+      { name: "Remo con barra", sets: 4, reps: 8 },
+      { name: "Jalón al pecho", sets: 3, reps: 10 },
+    ],
+  },
+  {
+    name: "Arnold — Hombros & Brazos",
+    exercises: [
+      { name: "Press Arnold", sets: 4, reps: 10 },
+      { name: "Elevaciones laterales", sets: 3, reps: 15 },
+      { name: "Face pull", sets: 3, reps: 15 },
+      { name: "Curl con barra EZ", sets: 3, reps: 12 },
+      { name: "Extensión en polea alta (cuerda)", sets: 3, reps: 12 },
+    ],
+  },
+  {
+    name: "Arnold — Pierna",
+    exercises: [
+      { name: "Sentadilla libre", sets: 4, reps: 8 },
+      { name: "Prensa de piernas", sets: 3, reps: 12 },
+      { name: "Peso muerto rumano", sets: 3, reps: 10 },
+      { name: "Curl de femoral tumbado", sets: 3, reps: 12 },
+      { name: "Pantorrillas de pie", sets: 4, reps: 15 },
+    ],
+  },
+];
 
 // ─── Day chips ────────────────────────────────────────────────────────────────
 
@@ -177,11 +255,242 @@ function TemplateCardSkeleton() {
   );
 }
 
+// ─── Template picker row (shared by user templates + catalog) ─────────────────
+
+function TemplatePickerRow({
+  name,
+  exerciseCount,
+  accent,
+  onClick,
+}: {
+  name: string;
+  exerciseCount: number;
+  accent: "primary" | "default";
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all duration-200 active:scale-[0.98]"
+      style={{
+        backgroundColor: "rgba(255,255,255,0.03)",
+        border: "1px solid rgba(255,255,255,0.07)",
+      }}
+    >
+      <div
+        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+        style={
+          accent === "primary"
+            ? {
+                backgroundColor: "rgba(37,119,255,0.10)",
+                border: "1px solid rgba(37,119,255,0.18)",
+              }
+            : {
+                backgroundColor: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.09)",
+              }
+        }
+      >
+        <Dumbbell
+          size={13}
+          strokeWidth={2}
+          style={{
+            color:
+              accent === "primary"
+                ? "rgba(37,119,255,0.70)"
+                : "rgba(255,255,255,0.35)",
+          }}
+        />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-sm text-white/80 truncate">{name}</p>
+        <p className="text-[11px] text-white/30">
+          {exerciseCount} ejercicio{exerciseCount !== 1 ? "s" : ""}
+        </p>
+      </div>
+    </button>
+  );
+}
+
+// ─── New routine modal ────────────────────────────────────────────────────────
+
+function NewRoutineModal({
+  templates,
+  onClose,
+}: {
+  templates: LocalWorkoutTemplate[];
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [showPicker, setShowPicker] = useState(false);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center"
+      style={{
+        backgroundColor: "rgba(0,0,0,0.65)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-t-3xl p-6 space-y-4 pb-10"
+        style={{
+          background: "rgba(11,11,19,0.98)",
+          border: "1px solid rgba(255,255,255,0.07)",
+          boxShadow: "0 -20px 60px rgba(0,0,0,0.8)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <p className="font-bold text-white/80 text-base">
+            {showPicker ? "Elige una plantilla" : "Crear rutina"}
+          </p>
+          <button
+            onClick={onClose}
+            className="text-white/25 hover:text-white/60 transition-colors p-1"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {!showPicker ? (
+          <div className="space-y-3">
+            {/* Desde cero */}
+            <button
+              onClick={() => {
+                onClose();
+                router.push("/workouts/templates/new");
+              }}
+              className="w-full flex items-center gap-4 p-4 rounded-2xl text-left transition-all duration-200 active:scale-[0.98] group"
+              style={{
+                backgroundColor: "rgba(37,119,255,0.07)",
+                border: "1px solid rgba(37,119,255,0.16)",
+              }}
+            >
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                style={{
+                  backgroundColor: "rgba(37,119,255,0.14)",
+                  border: "1px solid rgba(37,119,255,0.20)",
+                }}
+              >
+                <Plus
+                  size={16}
+                  style={{ color: "rgb(37,119,255)" }}
+                  strokeWidth={2.5}
+                />
+              </div>
+              <div>
+                <p className="font-bold text-sm text-white/85">
+                  Empezar desde cero
+                </p>
+                <p className="text-xs text-white/35 mt-0.5">
+                  Crea una rutina completamente nueva
+                </p>
+              </div>
+            </button>
+
+            {/* En base a plantilla */}
+            <button
+              onClick={() => setShowPicker(true)}
+              className="w-full flex items-center gap-4 p-4 rounded-2xl text-left transition-all duration-200 active:scale-[0.98]"
+              style={{
+                backgroundColor: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.07)",
+              }}
+            >
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.06)",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                }}
+              >
+                <Layers
+                  size={15}
+                  className="text-white/40"
+                  strokeWidth={1.75}
+                />
+              </div>
+              <div>
+                <p className="font-bold text-sm text-white/70">
+                  En base a una plantilla
+                </p>
+                <p className="text-xs text-white/30 mt-0.5">
+                  Elige una de tus rutinas o del catálogo
+                </p>
+              </div>
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-[28rem] overflow-y-auto overscroll-contain">
+            {/* User's own templates */}
+            {templates.length > 0 && (
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/25 mb-2">
+                  Tus rutinas
+                </p>
+                <div className="space-y-1.5">
+                  {templates.map((t) => (
+                    <TemplatePickerRow
+                      key={t.id}
+                      name={t.name}
+                      exerciseCount={t.exercises.length}
+                      accent="primary"
+                      onClick={() => {
+                        onClose();
+                        router.push(`/workouts/templates/new?clone=${t.id}`);
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Predefined catalog */}
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/25 mb-2">
+                Catálogo
+              </p>
+              <div className="space-y-1.5">
+                {TEMPLATE_CATALOG.map((t) => (
+                  <TemplatePickerRow
+                    key={t.name}
+                    name={t.name}
+                    exerciseCount={t.exercises.length}
+                    accent="default"
+                    onClick={() => {
+                      onClose();
+                      // Encode the catalog template as a URL param for the new page
+                      const params = new URLSearchParams({
+                        catalog: JSON.stringify({
+                          name: t.name,
+                          exercises: t.exercises,
+                        }),
+                      });
+                      router.push(
+                        `/workouts/templates/new?${params.toString()}`,
+                      );
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function WorkoutsPage() {
   const { templates, loading, deleteTemplate, patchTemplate } =
     useWorkoutTemplates();
+  const [showNewModal, setShowNewModal] = useState(false);
 
   const handleToggleDay = async (templateId: string, day: number) => {
     const template = templates.find((t) => t.id === templateId);
@@ -206,6 +515,13 @@ export default function WorkoutsPage() {
 
   return (
     <div className="space-y-5">
+      {showNewModal && (
+        <NewRoutineModal
+          templates={templates}
+          onClose={() => setShowNewModal(false)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -216,14 +532,14 @@ export default function WorkoutsPage() {
             Tus rutinas de entrenamiento
           </p>
         </div>
-        <Link
-          href="/workouts/templates/new"
+        <button
+          onClick={() => setShowNewModal(true)}
           className="flex items-center gap-1.5 bg-primary text-white text-sm font-bold px-5 py-2.5 rounded-full hover:bg-primary/90 active:scale-[0.97] transition-all duration-300 ease-out"
           style={{ boxShadow: "0 8px 32px -4px rgba(37,119,255,0.45)" }}
         >
           <Plus size={14} strokeWidth={2.5} />
           Nueva
-        </Link>
+        </button>
       </div>
 
       <p className="text-[11px] text-white/20">

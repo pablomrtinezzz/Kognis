@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.api.deps import get_current_user
@@ -8,6 +10,8 @@ from src.models.workout import (
     WorkoutSummary,
     WorkoutUpdate,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/workouts", tags=["Physical Module"])
 
@@ -214,6 +218,7 @@ async def get_workouts(user_id: str = Depends(get_current_user)):
         )
         return res.data
     except Exception as e:
+        logger.error("Failed to fetch workouts: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch workouts: {str(e)}",

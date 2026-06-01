@@ -28,17 +28,19 @@ def _next_review(box: int, correct: bool) -> tuple[int, datetime]:
 async def get_due_flashcards(
     user_id: str = Depends(get_current_user),
     document_id: str | None = Query(default=None),
+    all: bool = Query(default=False),
 ):
-    """Return flashcards due for review. Optionally filter by document_id."""
+    """Return flashcards due for review. Pass all=true to return every card
+    regardless of schedule (for repeat sessions)."""
     now = datetime.now(timezone.utc).isoformat()
     try:
         query = (
             db.table("flashcards")
             .select("id, document_id, front, back, box, next_review_at")
             .eq("user_id", user_id)
-            .lte("next_review_at", now)
-            .order("next_review_at")
         )
+        if not all:
+            query = query.lte("next_review_at", now).order("next_review_at")
         if document_id:
             query = query.eq("document_id", document_id)
         res = query.execute()

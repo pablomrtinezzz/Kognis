@@ -212,6 +212,11 @@ function WeeklyGrid() {
     return { index: i, date, template };
   });
 
+  const handleDayClick = (day: { date: Date }) => {
+    const dateStr = day.date.toISOString().slice(0, 10);
+    router.push(`/workouts/day/${dateStr}`);
+  };
+
   if (loading) {
     return (
       <div className="grid grid-cols-7 gap-2">
@@ -227,72 +232,71 @@ function WeeklyGrid() {
   }
 
   return (
-    <div className="grid grid-cols-7 gap-2">
-      {days.map(({ index, date, template }) => {
-        const isToday = index === todayIso;
-        const isPast = index < todayIso;
+    <>
+      <div className="grid grid-cols-7 gap-2">
+        {days.map(({ index, date, template }) => {
+          const isToday = index === todayIso;
+          const isPast = index < todayIso;
 
-        let cellBg: string;
-        let cellBorder: string;
-        if (isToday && template) {
-          cellBg = "rgba(37,119,255,0.10)";
-          cellBorder = "rgba(37,119,255,0.28)";
-        } else if (isToday) {
-          cellBg = "rgba(255,255,255,0.04)";
-          cellBorder = "rgba(255,255,255,0.12)";
-        } else if (template) {
-          cellBg = "rgba(255,255,255,0.03)";
-          cellBorder = "rgba(255,255,255,0.07)";
-        } else {
-          cellBg = "transparent";
-          cellBorder = "rgba(255,255,255,0.04)";
-        }
+          let cellBg: string;
+          let cellBorder: string;
+          if (isToday && template) {
+            cellBg = "rgba(37,119,255,0.10)";
+            cellBorder = "rgba(37,119,255,0.28)";
+          } else if (isToday) {
+            cellBg = "rgba(255,255,255,0.04)";
+            cellBorder = "rgba(255,255,255,0.12)";
+          } else if (template) {
+            cellBg = "rgba(255,255,255,0.03)";
+            cellBorder = "rgba(255,255,255,0.07)";
+          } else {
+            cellBg = "transparent";
+            cellBorder = "rgba(255,255,255,0.04)";
+          }
 
-        return (
-          <button
-            key={index}
-            type="button"
-            disabled={!template}
-            onClick={() =>
-              template && router.push(`/workouts/new?from=${template.id}`)
-            }
-            className="flex flex-col items-center gap-2 py-3 px-1 rounded-2xl border transition-all duration-300 ease-out"
-            style={{ backgroundColor: cellBg, borderColor: cellBorder }}
-          >
-            <span
-              className="text-[9px] font-bold uppercase tracking-wider"
-              style={{
-                color: isToday ? "rgb(37,119,255)" : "rgba(255,255,255,0.25)",
-              }}
+          return (
+            <button
+              key={index}
+              type="button"
+              onClick={() => handleDayClick({ date })}
+              className="flex flex-col items-center gap-2 py-3 px-1 rounded-2xl border transition-all duration-300 ease-out hover:bg-white/[0.04] active:scale-[0.95]"
+              style={{ backgroundColor: cellBg, borderColor: cellBorder }}
             >
-              {DAY_LABELS[index]}
-            </span>
-            <span
-              className="text-sm font-bold tabular-nums leading-none"
-              style={{
-                color: isToday
-                  ? "rgb(37,119,255)"
-                  : isPast
-                    ? "rgba(255,255,255,0.18)"
-                    : "rgba(255,255,255,0.55)",
-              }}
-            >
-              {date.getDate()}
-            </span>
-            <div
-              className="w-1.5 h-1.5 rounded-full"
-              style={{
-                backgroundColor: template
-                  ? isToday
+              <span
+                className="text-[9px] font-bold uppercase tracking-wider"
+                style={{
+                  color: isToday ? "rgb(37,119,255)" : "rgba(255,255,255,0.25)",
+                }}
+              >
+                {DAY_LABELS[index]}
+              </span>
+              <span
+                className="text-sm font-bold tabular-nums leading-none"
+                style={{
+                  color: isToday
                     ? "rgb(37,119,255)"
-                    : "rgba(16,185,129,0.55)"
-                  : "transparent",
-              }}
-            />
-          </button>
-        );
-      })}
-    </div>
+                    : isPast
+                      ? "rgba(255,255,255,0.18)"
+                      : "rgba(255,255,255,0.55)",
+                }}
+              >
+                {date.getDate()}
+              </span>
+              <div
+                className="w-1.5 h-1.5 rounded-full"
+                style={{
+                  backgroundColor: template
+                    ? isToday
+                      ? "rgb(37,119,255)"
+                      : "rgba(16,185,129,0.55)"
+                    : "transparent",
+                }}
+              />
+            </button>
+          );
+        })}
+      </div>
+    </>
   );
 }
 

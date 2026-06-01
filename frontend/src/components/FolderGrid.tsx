@@ -126,6 +126,7 @@ export function useFolders() {
     deleteFolder,
     renameFolder,
     assignDocument,
+    reload,
   };
 }
 

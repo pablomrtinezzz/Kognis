@@ -399,7 +399,7 @@ function NewWorkoutInner() {
       }
 
       toast("Entreno guardado", "success");
-      router.replace("/workouts");
+      router.replace("/progress");
     } catch {
       setError("Failed to save workout locally.");
       setSaving(false);
@@ -477,7 +477,7 @@ function NewWorkoutInner() {
 
         {/* Right Column */}
         <div className="flex flex-col gap-6">
-          <ExerciseList exercises={exercises} actions={actions} />
+          <ExerciseList exercises={exercises} actions={actions} showChecks />
         </div>
       </div>
     </div>

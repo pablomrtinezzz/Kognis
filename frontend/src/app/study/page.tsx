@@ -282,10 +282,14 @@ function BoxDots({ box }: { box: number }) {
 
 function StudyView({
   documentId,
+  all,
   onExit,
+  onRepeatAll,
 }: {
   documentId?: string;
+  all?: boolean;
   onExit: () => void;
+  onRepeatAll: () => void;
 }) {
   const {
     currentCard,
@@ -297,7 +301,8 @@ function StudyView({
     skipCard,
     deleteCard,
     editCard,
-  } = useStudySession(documentId);
+    restart,
+  } = useStudySession(documentId, all);
 
   const [flipped, setFlipped] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -450,7 +455,7 @@ function StudyView({
           ))}
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap justify-center">
           <button
             onClick={onExit}
             className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-white/50 text-sm font-semibold hover:text-white/75 transition-all duration-200"
@@ -460,10 +465,24 @@ function StudyView({
             }}
           >
             <ChevronLeft size={14} />
-            Dashboard
+            Volver
           </button>
+          {!all && (
+            <button
+              onClick={restart}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200"
+              style={{
+                backgroundColor: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "rgba(255,255,255,0.55)",
+              }}
+            >
+              <RotateCcw size={14} />
+              Solo pendientes
+            </button>
+          )}
           <button
-            onClick={() => window.location.reload()}
+            onClick={onRepeatAll}
             className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200"
             style={{
               backgroundColor: "rgba(37,119,255,0.10)",
@@ -472,7 +491,7 @@ function StudyView({
             }}
           >
             <RotateCcw size={14} />
-            Study again
+            Repetir todo
           </button>
         </div>
       </div>
@@ -772,53 +791,92 @@ function UploadZone({
   );
 }
 
-// ─── Deck summary popover ─────────────────────────────────────────────────────
+// ─── Summary renderer ─────────────────────────────────────────────────────────
 
-function DeckSummary({ docId }: { docId: string }) {
+function SummaryContent({ text }: { text: string }) {
+  const lines = text.split("\n");
+  const nodes: React.ReactNode[] = [];
+  let key = 0;
+
+  for (const line of lines) {
+    if (line.startsWith("## ")) {
+      nodes.push(
+        <p
+          key={key++}
+          className="text-[11px] font-bold uppercase tracking-[0.10em] mt-4 mb-1.5 first:mt-0"
+          style={{ color: "rgba(37,119,255,0.75)" }}
+        >
+          {line.slice(3)}
+        </p>,
+      );
+    } else if (line.startsWith("- ") || line.startsWith("* ")) {
+      nodes.push(
+        <div key={key++} className="flex gap-2 py-0.5">
+          <span className="shrink-0 mt-[5px] w-1 h-1 rounded-full bg-white/20" />
+          <span className="text-xs text-white/55 leading-relaxed">
+            {line.slice(2)}
+          </span>
+        </div>,
+      );
+    } else if (line.trim()) {
+      nodes.push(
+        <p key={key++} className="text-xs text-white/50 leading-relaxed py-0.5">
+          {line}
+        </p>,
+      );
+    }
+  }
+  return <div className="space-y-0.5">{nodes}</div>;
+}
+
+function DeckSummaryPanel({ docId }: { docId: string }) {
   const { session } = useAuth();
   const token = session?.access_token;
   const [summary, setSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
 
-  const fetchSummary = useCallback(async () => {
-    if (summary !== null) return;
-    try {
-      const data = await apiGet<{ content: string }>(
-        `/api/v1/documents/${docId}/summary`,
-        token,
-      );
-      setSummary(data.content);
-    } catch {
-      setSummary("");
-    } finally {
-      setLoading(false);
-    }
-  }, [docId, token, summary]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await apiGet<{ content: string }>(
+          `/api/v1/documents/${docId}/summary`,
+          token,
+        );
+        setSummary(data.content);
+      } catch {
+        setSummary(null);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [docId, token]);
 
-  const handleToggle = () => {
-    if (!open) fetchSummary();
-    setOpen((v) => !v);
-  };
+  if (loading) {
+    return (
+      <div className="space-y-2 py-2">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="h-3 rounded animate-pulse"
+            style={{
+              width: i === 2 ? "70%" : "100%",
+              backgroundColor: "rgba(255,255,255,0.04)",
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
 
-  if (summary === "") return null;
+  if (!summary) {
+    return (
+      <p className="text-xs text-white/25 italic py-2">
+        Sin resumen disponible. Vuelve a procesar el documento para generarlo.
+      </p>
+    );
+  }
 
-  return (
-    <div>
-      <button
-        onClick={handleToggle}
-        className="text-[11px] font-medium text-white/25 hover:text-white/50 transition-colors flex items-center gap-1"
-      >
-        <Sparkles size={10} />
-        {open ? "Hide summary" : "AI summary"}
-      </button>
-      {open && (
-        <div className="mt-2 text-xs text-white/45 leading-relaxed border-l-2 border-white/[0.08] pl-3">
-          {loading ? <span className="text-white/20">Loading…</span> : summary}
-        </div>
-      )}
-    </div>
-  );
+  return <SummaryContent text={summary} />;
 }
 
 // ─── Deck card ────────────────────────────────────────────────────────────────
@@ -834,10 +892,11 @@ function DeckCard({
   doc: DocumentItem;
   folders: Folder[];
   assignments: Record<string, string>;
-  onStudy: (id: string) => void;
+  onStudy: (id: string, all?: boolean) => void;
   onAssign: (docId: string, folderId: string | null) => void;
   onDelete: (id: string) => void;
 }) {
+  const [tab, setTab] = useState<"flashcards" | "resumen">("flashcards");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const toast = useToast();
@@ -852,14 +911,15 @@ function DeckCard({
   const handleDelete = async () => {
     try {
       await onDelete(doc.id);
-      toast(`"${name}" deleted`, "success");
+      toast(`"${name}" eliminado`, "success");
     } catch {
-      toast("Could not delete deck. Try again.", "error");
+      toast("No se pudo eliminar. Inténtalo de nuevo.", "error");
     }
   };
 
   return (
     <GlassPanel hover glow className="p-5 flex flex-col gap-4">
+      {/* ── Header ── */}
       <div className="flex items-start gap-3">
         <div
           className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 mt-0.5"
@@ -877,12 +937,11 @@ function DeckCard({
           </p>
           <p className="text-[11px] text-white/30 mt-0.5 font-medium">
             {hasCards
-              ? `${doc.flashcard_count} cards`
-              : "No cards yet — process to generate"}
+              ? `${doc.flashcard_count} tarjetas`
+              : "Sin tarjetas — procesa el PDF para generarlas"}
           </p>
         </div>
 
-        {/* A2 — Delete deck */}
         <div className="flex items-center gap-1 shrink-0">
           {hasDue && (
             <span
@@ -903,7 +962,7 @@ function DeckCard({
                 onClick={handleDelete}
                 className="text-[10px] font-bold text-red-400 px-1.5 py-0.5 rounded-lg hover:bg-red-400/[0.08] transition-colors"
               >
-                Delete
+                Borrar
               </button>
               <button
                 onClick={() => setDeleteConfirm(false)}
@@ -916,7 +975,7 @@ function DeckCard({
             <button
               onClick={() => setDeleteConfirm(true)}
               className="text-white/15 hover:text-red-400 p-1 rounded-lg hover:bg-red-400/[0.06] transition-all duration-200"
-              aria-label="Delete deck"
+              aria-label="Eliminar deck"
             >
               <Trash2 size={12} />
             </button>
@@ -924,118 +983,147 @@ function DeckCard({
         </div>
       </div>
 
+      {/* ── Tabs ── */}
       {hasCards && (
-        <div className="space-y-1.5">
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] text-white/20 font-semibold uppercase tracking-wider">
-              Mastery
-            </span>
-            <span className="text-[10px] text-white/30 tabular-nums font-semibold">
-              {Math.round(masteryPct)}%
-            </span>
-          </div>
-          <div className="h-[3px] rounded-full bg-white/[0.06] overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-700"
-              style={{
-                width: `${masteryPct}%`,
-                background:
-                  "linear-gradient(to right, rgba(37,119,255,0.70), rgb(37,119,255))",
-              }}
-            />
-          </div>
+        <div
+          className="flex gap-1 p-0.5 rounded-xl"
+          style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
+        >
+          {(
+            [
+              { id: "flashcards", label: "Flashcards" },
+              { id: "resumen", label: "Resumen" },
+            ] as const
+          ).map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className="flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all duration-200"
+              style={
+                tab === id
+                  ? {
+                      backgroundColor: "rgba(37,119,255,0.14)",
+                      color: "rgb(37,119,255)",
+                      border: "1px solid rgba(37,119,255,0.22)",
+                    }
+                  : {
+                      color: "rgba(255,255,255,0.30)",
+                      border: "1px solid transparent",
+                    }
+              }
+            >
+              {label}
+            </button>
+          ))}
         </div>
       )}
 
-      {/* B3 — AI summary */}
-      {hasCards && <DeckSummary docId={doc.id} />}
-
-      {/* Folder assignment row */}
-      {folders.length > 0 && (
-        <div className="relative">
-          <button
-            onClick={() => setPickerOpen((v) => !v)}
-            className="flex items-center gap-1.5 text-[11px] font-medium transition-colors duration-200"
-            style={{
-              color: currentFolder
-                ? "rgba(37,119,255,0.70)"
-                : "rgba(255,255,255,0.25)",
-            }}
-          >
-            <FolderOpen size={12} strokeWidth={1.75} />
-            {currentFolder ? currentFolder.name : "No folder"}
-          </button>
-
-          {pickerOpen && (
-            <div
-              className="absolute bottom-full mb-1 left-0 z-20 rounded-xl overflow-hidden min-w-[160px]"
-              style={{
-                backgroundColor: "rgba(11,11,20,0.97)",
-                border: "1px solid rgba(255,255,255,0.07)",
-                boxShadow: "0 20px 60px rgba(0,0,0,0.9)",
-                backdropFilter: "blur(20px)",
-                WebkitBackdropFilter: "blur(20px)",
-              }}
-            >
-              <button
-                onClick={() => {
-                  onAssign(doc.id, null);
-                  setPickerOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 text-xs text-white/40 hover:bg-white/[0.05] hover:text-white/70 transition-colors"
-              >
-                No folder
-              </button>
-              {folders.map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => {
-                    onAssign(doc.id, f.id);
-                    setPickerOpen(false);
-                  }}
-                  className="w-full text-left px-3 py-2 text-xs transition-colors"
+      {/* ── Flashcards tab ── */}
+      {(!hasCards || tab === "flashcards") && (
+        <>
+          {hasCards && (
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] text-white/20 font-semibold uppercase tracking-wider">
+                  Dominio
+                </span>
+                <span className="text-[10px] text-white/30 tabular-nums font-semibold">
+                  {Math.round(masteryPct)}%
+                </span>
+              </div>
+              <div className="h-[3px] rounded-full bg-white/[0.06] overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
                   style={{
-                    color:
-                      assignments[doc.id] === f.id
-                        ? "rgb(37,119,255)"
-                        : "rgba(255,255,255,0.60)",
-                    backgroundColor:
-                      assignments[doc.id] === f.id
-                        ? "rgba(37,119,255,0.07)"
-                        : "transparent",
+                    width: `${masteryPct}%`,
+                    background:
+                      "linear-gradient(to right, rgba(37,119,255,0.70), rgb(37,119,255))",
                   }}
-                >
-                  {f.name}
-                </button>
-              ))}
+                />
+              </div>
             </div>
           )}
-        </div>
+
+          {/* Folder assignment — no "No folder" option */}
+          {folders.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setPickerOpen((v) => !v)}
+                className="flex items-center gap-1.5 text-[11px] font-medium transition-colors duration-200"
+                style={{
+                  color: currentFolder
+                    ? "rgba(37,119,255,0.70)"
+                    : "rgba(255,255,255,0.25)",
+                }}
+              >
+                <FolderOpen size={12} strokeWidth={1.75} />
+                {currentFolder ? currentFolder.name : "Sin carpeta"}
+              </button>
+
+              {pickerOpen && (
+                <div
+                  className="absolute bottom-full mb-1 left-0 z-20 rounded-xl overflow-hidden min-w-[160px]"
+                  style={{
+                    backgroundColor: "rgba(11,11,20,0.97)",
+                    border: "1px solid rgba(255,255,255,0.07)",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.9)",
+                    backdropFilter: "blur(20px)",
+                    WebkitBackdropFilter: "blur(20px)",
+                  }}
+                >
+                  {folders.map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => {
+                        onAssign(doc.id, f.id);
+                        setPickerOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs transition-colors"
+                      style={{
+                        color:
+                          assignments[doc.id] === f.id
+                            ? "rgb(37,119,255)"
+                            : "rgba(255,255,255,0.60)",
+                        backgroundColor:
+                          assignments[doc.id] === f.id
+                            ? "rgba(37,119,255,0.07)"
+                            : "transparent",
+                      }}
+                    >
+                      {f.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {hasCards && (
+            <button
+              onClick={() => onStudy(doc.id, !hasDue)}
+              className="w-full py-2.5 rounded-xl text-sm font-bold transition-all duration-200 active:scale-[0.98]"
+              style={
+                hasDue
+                  ? {
+                      backgroundColor: "rgba(37,119,255,0.10)",
+                      border: "1px solid rgba(37,119,255,0.20)",
+                      color: "rgb(37,119,255)",
+                    }
+                  : {
+                      backgroundColor: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                      color: "rgba(255,255,255,0.35)",
+                    }
+              }
+            >
+              {hasDue ? "Estudiar ahora" : "Repasar todo ↺"}
+            </button>
+          )}
+        </>
       )}
 
-      {hasCards && (
-        <button
-          onClick={() => onStudy(doc.id)}
-          disabled={!hasDue}
-          className="w-full py-2.5 rounded-xl text-sm font-bold transition-all duration-200 active:scale-[0.98]"
-          style={
-            hasDue
-              ? {
-                  backgroundColor: "rgba(37,119,255,0.10)",
-                  border: "1px solid rgba(37,119,255,0.20)",
-                  color: "rgb(37,119,255)",
-                }
-              : {
-                  backgroundColor: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.05)",
-                  color: "rgba(255,255,255,0.18)",
-                  cursor: "default",
-                }
-          }
-        >
-          {hasDue ? "Study now" : "All caught up ✓"}
-        </button>
-      )}
+      {/* ── Resumen tab ── */}
+      {hasCards && tab === "resumen" && <DeckSummaryPanel docId={doc.id} />}
     </GlassPanel>
   );
 }
@@ -1095,7 +1183,7 @@ function DeckList({
   folders: Folder[];
   assignments: Record<string, string>;
   loading: boolean;
-  onStudy: (id: string) => void;
+  onStudy: (id: string, all?: boolean) => void;
   onAssign: (docId: string, folderId: string | null) => void;
   onDelete: (id: string) => void;
 }) {
@@ -1157,7 +1245,7 @@ function DashboardView({
   onStudyDeck,
 }: {
   onStartAll: () => void;
-  onStudyDeck: (id: string) => void;
+  onStudyDeck: (id: string, all?: boolean) => void;
 }) {
   const {
     documents,
@@ -1166,8 +1254,6 @@ function DashboardView({
     uploadAndProcess,
     deleteDocument,
     resetUpload,
-    totalDue,
-    totalCards,
   } = useDocuments();
 
   const {
@@ -1177,6 +1263,7 @@ function DashboardView({
     deleteFolder,
     renameFolder,
     assignDocument,
+    reload: reloadFolders,
   } = useFolders();
 
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
@@ -1185,9 +1272,21 @@ function DashboardView({
     ? documents.filter((d) => assignments[d.id] === selectedFolder.id)
     : documents;
 
-  const folderDue = selectedFolder
-    ? visibleDocuments.reduce((s, d) => s + d.due_count, 0)
-    : totalDue;
+  const folderDue = visibleDocuments.reduce((s, d) => s + d.due_count, 0);
+  const folderCards = visibleDocuments.reduce(
+    (s, d) => s + d.flashcard_count,
+    0,
+  );
+
+  // After a successful upload the Dexie assignment was written inside the hook;
+  // reload folder assignments so the DeckCard picker reflects the change.
+  const prevStage = useRef(uploadState.stage);
+  useEffect(() => {
+    if (prevStage.current !== "done" && uploadState.stage === "done") {
+      reloadFolders();
+    }
+    prevStage.current = uploadState.stage;
+  }, [uploadState.stage, reloadFolders]);
 
   return (
     <div className="space-y-8">
@@ -1200,7 +1299,7 @@ function DashboardView({
               className="flex items-center gap-1.5 text-white/35 hover:text-white/65 transition-colors text-xs font-medium mb-1"
             >
               <ChevronLeft size={13} />
-              All folders
+              Folders
             </button>
           ) : (
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/25 mb-0.5">
@@ -1213,92 +1312,115 @@ function DashboardView({
         </div>
       </div>
 
-      {/* ── Study-all CTA ── */}
-      {folderDue > 0 && (
-        <button
-          onClick={onStartAll}
-          className="w-full flex items-center gap-4 p-5 rounded-3xl active:scale-[0.99] transition-all duration-300 group"
-          style={{
-            backgroundColor: "rgba(37,119,255,0.07)",
-            border: "1px solid rgba(37,119,255,0.16)",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              "rgba(37,119,255,0.12)";
-            (e.currentTarget as HTMLButtonElement).style.borderColor =
-              "rgba(37,119,255,0.26)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              "rgba(37,119,255,0.07)";
-            (e.currentTarget as HTMLButtonElement).style.borderColor =
-              "rgba(37,119,255,0.16)";
-          }}
-        >
-          <div
-            className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
-            style={{
-              backgroundColor: "rgba(37,119,255,0.14)",
-              border: "1px solid rgba(37,119,255,0.18)",
-            }}
-          >
-            <Brain
-              size={18}
-              style={{ color: "rgb(37,119,255)" }}
-              strokeWidth={2}
-            />
-          </div>
-          <div className="flex-1 text-left">
-            <p className="font-bold text-white/90 text-sm">
-              {folderDue} card{folderDue !== 1 ? "s" : ""} ready for review
-            </p>
-            <p
-              className="text-xs mt-0.5 font-medium tracking-wide"
-              style={{ color: "rgba(37,119,255,0.55)" }}
-            >
-              Start full session →
-            </p>
-          </div>
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-            style={{
-              backgroundColor: "rgba(37,119,255,0.12)",
-              border: "1px solid rgba(37,119,255,0.16)",
-            }}
-          >
-            <Layers size={14} style={{ color: "rgb(37,119,255)" }} />
-          </div>
-        </button>
-      )}
-
-      {/* ── Stats ── */}
-      {!loading && documents.length > 0 && !selectedFolder && (
-        <StatsStrip
-          totalDue={totalDue}
-          totalCards={totalCards}
-          deckCount={documents.length}
-        />
-      )}
-
-      {/* ── Folder grid OR folder-detail deck list ── */}
       {selectedFolder === null ? (
+        /* ── ROOT: folders only ─────────────────────────────────────── */
+        <FolderGrid
+          folders={folders}
+          documents={documents}
+          assignments={assignments}
+          onSelectFolder={setSelectedFolder}
+          onCreateFolder={(name) => createFolder(name)}
+          onDeleteFolder={deleteFolder}
+          onRenameFolder={renameFolder}
+        />
+      ) : (
+        /* ── FOLDER VIEW ────────────────────────────────────────────── */
         <>
-          <FolderGrid
-            folders={folders}
-            documents={documents}
-            assignments={assignments}
-            onSelectFolder={setSelectedFolder}
-            onCreateFolder={(name) => createFolder(name)}
-            onDeleteFolder={deleteFolder}
-            onRenameFolder={renameFolder}
-          />
+          {/* Study-all CTA */}
+          {folderDue > 0 && (
+            <button
+              onClick={onStartAll}
+              className="w-full flex items-center gap-4 p-5 rounded-3xl active:scale-[0.99] transition-all duration-300"
+              style={{
+                backgroundColor: "rgba(37,119,255,0.07)",
+                border: "1px solid rgba(37,119,255,0.16)",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                  "rgba(37,119,255,0.12)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor =
+                  "rgba(37,119,255,0.26)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                  "rgba(37,119,255,0.07)";
+                (e.currentTarget as HTMLButtonElement).style.borderColor =
+                  "rgba(37,119,255,0.16)";
+              }}
+            >
+              <div
+                className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
+                style={{
+                  backgroundColor: "rgba(37,119,255,0.14)",
+                  border: "1px solid rgba(37,119,255,0.18)",
+                }}
+              >
+                <Brain
+                  size={18}
+                  style={{ color: "rgb(37,119,255)" }}
+                  strokeWidth={2}
+                />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-bold text-white/90 text-sm">
+                  {folderDue} card{folderDue !== 1 ? "s" : ""} ready for review
+                </p>
+                <p
+                  className="text-xs mt-0.5 font-medium tracking-wide"
+                  style={{ color: "rgba(37,119,255,0.55)" }}
+                >
+                  Start session →
+                </p>
+              </div>
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                style={{
+                  backgroundColor: "rgba(37,119,255,0.12)",
+                  border: "1px solid rgba(37,119,255,0.16)",
+                }}
+              >
+                <Layers size={14} style={{ color: "rgb(37,119,255)" }} />
+              </div>
+            </button>
+          )}
 
+          {/* Folder stats */}
+          {!loading && visibleDocuments.length > 0 && (
+            <StatsStrip
+              totalDue={folderDue}
+              totalCards={folderCards}
+              deckCount={visibleDocuments.length}
+            />
+          )}
+
+          {/* Upload zone — auto-assigns to this folder */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/25 mb-3">
+              Add material
+            </p>
+            <UploadZone
+              onUpload={(file) => uploadAndProcess(file, selectedFolder.id)}
+              stage={uploadState.stage}
+              message={uploadState.message}
+            />
+            {(uploadState.stage === "done" ||
+              uploadState.stage === "error") && (
+              <button
+                onClick={resetUpload}
+                className="mt-2 w-full text-center text-xs text-white/25 hover:text-white/45 transition-colors py-1.5"
+              >
+                Upload another
+              </button>
+            )}
+          </div>
+
+          {/* Deck list */}
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/25 mb-4">
-              All decks
+              Decks
             </p>
             <DeckList
-              documents={documents}
+              documents={visibleDocuments}
               folders={folders}
               assignments={assignments}
               loading={loading}
@@ -1308,58 +1430,28 @@ function DashboardView({
             />
           </div>
         </>
-      ) : (
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/25 mb-4">
-            Decks in this folder
-          </p>
-          <DeckList
-            documents={visibleDocuments}
-            folders={folders}
-            assignments={assignments}
-            loading={loading}
-            onStudy={onStudyDeck}
-            onAssign={assignDocument}
-            onDelete={deleteDocument}
-          />
-        </div>
       )}
-
-      {/* ── Upload ── */}
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/25 mb-3">
-          Add material
-        </p>
-        <UploadZone
-          onUpload={uploadAndProcess}
-          stage={uploadState.stage}
-          message={uploadState.message}
-        />
-        {(uploadState.stage === "done" || uploadState.stage === "error") && (
-          <button
-            onClick={resetUpload}
-            className="mt-2 w-full text-center text-xs text-white/25 hover:text-white/45 transition-colors py-1.5"
-          >
-            Upload another
-          </button>
-        )}
-      </div>
     </div>
   );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type View = { mode: "dashboard" } | { mode: "study"; documentId?: string };
+type View =
+  | { mode: "dashboard" }
+  | { mode: "study"; documentId?: string; all?: boolean };
 
 export default function StudyPage() {
   const [view, setView] = useState<View>({ mode: "dashboard" });
 
   if (view.mode === "study") {
+    const { documentId, all } = view;
     return (
       <StudyView
-        documentId={view.documentId}
+        documentId={documentId}
+        all={all}
         onExit={() => setView({ mode: "dashboard" })}
+        onRepeatAll={() => setView({ mode: "study", documentId, all: true })}
       />
     );
   }
@@ -1367,7 +1459,7 @@ export default function StudyPage() {
   return (
     <DashboardView
       onStartAll={() => setView({ mode: "study" })}
-      onStudyDeck={(id) => setView({ mode: "study", documentId: id })}
+      onStudyDeck={(id, all) => setView({ mode: "study", documentId: id, all })}
     />
   );
 }
